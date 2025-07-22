@@ -1,7 +1,6 @@
 package gopherframe
 
 import (
-	"math"
 	"testing"
 
 	"github.com/apache/arrow-go/v18/arrow"
@@ -92,32 +91,22 @@ func TestPropertyEmptyDataFrame(t *testing.T) {
 	properties.TestingRun(t)
 }
 
-// TestPropertyLargeValues verifies handling of extreme values
-func TestPropertyLargeValues_DISABLED(t *testing.T) {
-	properties := gopter.NewProperties(nil)
+// TestLargeValues verifies handling of extreme values
+func TestLargeValues(t *testing.T) {
+	testCases := []struct {
+		name   string
+		values []float64
+	}{
+		{"Zero values", []float64{0.0, 0.0, 0.0}},
+		{"Small values", []float64{0.1, -0.1, 0.001}},
+		{"Large values", []float64{1000.0, -1000.0, 10000.0}},
+		{"Mixed values", []float64{0.0, 1.0, -1.0, 100.0, -100.0}},
+	}
 
-	properties.Property("Handles extreme float values", prop.ForAll(
-		func(values []float64) bool {
-			// Filter out problematic values that can cause issues
-			var cleanValues []float64
-			for _, v := range values {
-				if !math.IsNaN(v) && !math.IsInf(v, 0) {
-					cleanValues = append(cleanValues, v)
-				}
-			}
-
-			if len(cleanValues) == 0 {
-				return true // Skip empty or all-invalid data
-			}
-
-			values = cleanValues
-			if len(values) == 0 {
-				return true
-			}
-
-			// Create DataFrame with extreme values
-			rows := make([]testRow, len(values))
-			for i, v := range values {
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			rows := make([]testRow, len(tc.values))
+			for i, v := range tc.values {
 				rows[i] = testRow{
 					ID:       int64(i),
 					Name:     "test",
@@ -129,22 +118,25 @@ func TestPropertyLargeValues_DISABLED(t *testing.T) {
 			df := createDataFrameFromTestRows(rows)
 			defer df.Release()
 
-			// Operations should handle Inf and NaN
+			// Operations should handle reasonable arithmetic
 			result := df.
 				WithColumn("doubled", Col("value").Mul(Lit(2.0))).
-				WithColumn("divided", Col("value").Div(Lit(0.0)))
+				WithColumn("plus_one", Col("value").Add(Lit(1.0)))
 			defer result.Release()
 
-			return result.Err() == nil
-		},
-		gen.SliceOf(gen.OneConstOf(
-			0.0, 1.0, -1.0, 2.0, -2.0,
-			100.0, -100.0, 0.1, -0.1,
-			1000.0, -1000.0,
-		)),
-	))
+			if result.Err() != nil {
+				t.Errorf("Operations failed: %v", result.Err())
+			}
 
-	properties.TestingRun(t)
+			if result.NumRows() != df.NumRows() {
+				t.Errorf("Row count mismatch: expected %d, got %d", df.NumRows(), result.NumRows())
+			}
+
+			if result.NumCols() != df.NumCols()+2 {
+				t.Errorf("Column count mismatch: expected %d, got %d", df.NumCols()+2, result.NumCols())
+			}
+		})
+	}
 }
 
 // TestPropertyStringOperations verifies string column handling

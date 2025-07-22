@@ -69,13 +69,15 @@ func (gdf *GroupedDataFrame) Agg(aggregations ...Aggregation) *DataFrame {
 
 // performGroupBy executes the actual groupby logic
 func (gdf *GroupedDataFrame) performGroupBy(aggregations []Aggregation) (*DataFrame, error) {
-	// This is a simplified implementation for demonstration
-	// A production implementation would use Arrow compute kernels for efficiency
-
-	if len(gdf.groupByCols) != 1 {
-		return nil, fmt.Errorf("multi-column groupby not yet implemented")
+	// Handle both single and multi-column groupby
+	if len(gdf.groupByCols) == 1 {
+		return gdf.performSingleColumnGroupBy(aggregations)
 	}
+	return gdf.performMultiColumnGroupBy(aggregations)
+}
 
+// performSingleColumnGroupBy handles single column grouping
+func (gdf *GroupedDataFrame) performSingleColumnGroupBy(aggregations []Aggregation) (*DataFrame, error) {
 	groupCol := gdf.groupByCols[0]
 
 	// Get the grouping column
@@ -438,4 +440,167 @@ func (a Aggregation) As(alias string) Aggregation {
 // Name returns the name of the aggregation result column.
 func (a Aggregation) Name() string {
 	return a.alias
+}
+
+// performMultiColumnGroupBy handles multi-column grouping
+func (gdf *GroupedDataFrame) performMultiColumnGroupBy(aggregations []Aggregation) (*DataFrame, error) {
+	// Get all grouping columns
+	var groupSeries []*core.Series
+	for _, col := range gdf.groupByCols {
+		series, err := gdf.df.coreDF.Column(col)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get group column %s: %w", col, err)
+		}
+		groupSeries = append(groupSeries, series)
+	}
+	defer func() {
+		for _, series := range groupSeries {
+			series.Release()
+		}
+	}()
+
+	// Build composite keys and group indices
+	groupKeys, groupIndices, err := gdf.extractMultiColumnGroups(groupSeries)
+	if err != nil {
+		return nil, fmt.Errorf("failed to extract multi-column groups: %w", err)
+	}
+
+	// Build result columns - start with group columns
+	var resultFields []arrow.Field
+	var resultColumns []arrow.Array
+
+	// Add group key columns to result
+	for i, col := range gdf.groupByCols {
+		resultFields = append(resultFields, arrow.Field{Name: col, Type: groupSeries[i].DataType()})
+	}
+
+	// Create arrays for each group column
+	pool := memory.NewGoAllocator()
+	for i, col := range gdf.groupByCols {
+		builder := createBuilderForType(groupSeries[i].DataType(), pool)
+		defer builder.Release()
+
+		for _, key := range groupKeys {
+			if len(groupIndices[key]) > 0 {
+				firstIdx := groupIndices[key][0] // Use first row in group for group key
+				if err := appendValueFromSeries(builder, groupSeries[i], firstIdx); err != nil {
+					return nil, fmt.Errorf("failed to append group value for column %s: %w", col, err)
+				}
+			}
+		}
+		resultColumns = append(resultColumns, builder.NewArray())
+	}
+
+	// Add aggregation columns
+	for _, agg := range aggregations {
+		aggField, aggColumn, err := gdf.performAggregation(agg, groupIndices)
+		if err != nil {
+			return nil, fmt.Errorf("failed to perform aggregation %s: %w", agg.Name(), err)
+		}
+		resultFields = append(resultFields, aggField)
+		resultColumns = append(resultColumns, aggColumn)
+	}
+
+	// Create result schema and record
+	resultSchema := arrow.NewSchema(resultFields, nil)
+	resultRecord := array.NewRecord(resultSchema, resultColumns, int64(len(groupKeys)))
+
+	return NewDataFrame(resultRecord), nil
+}
+
+// extractMultiColumnGroups creates composite keys from multiple columns
+func (gdf *GroupedDataFrame) extractMultiColumnGroups(groupSeries []*core.Series) ([]string, map[string][]int, error) {
+	if len(groupSeries) == 0 {
+		return nil, nil, fmt.Errorf("no group series provided")
+	}
+
+	numRows := groupSeries[0].Len()
+	groupMap := make(map[string][]int)
+
+	// Build composite keys by concatenating column values
+	for i := 0; i < numRows; i++ {
+		var keyParts []string
+		skipRow := false
+
+		for _, series := range groupSeries {
+			if series.IsNull(i) {
+				skipRow = true
+				break
+			}
+
+			value, err := series.GetString(i)
+			if err != nil {
+				return nil, nil, fmt.Errorf("failed to get string value: %w", err)
+			}
+			keyParts = append(keyParts, value)
+		}
+
+		if !skipRow {
+			key := fmt.Sprintf("%v", keyParts) // Simple string representation of composite key
+			groupMap[key] = append(groupMap[key], i)
+		}
+	}
+
+	// Sort group keys for consistent output
+	var groupKeys []string
+	for key := range groupMap {
+		groupKeys = append(groupKeys, key)
+	}
+	sort.Strings(groupKeys)
+
+	return groupKeys, groupMap, nil
+}
+
+// createBuilderForType creates appropriate builder for Arrow data type
+func createBuilderForType(dataType arrow.DataType, pool memory.Allocator) array.Builder {
+	switch dataType.ID() {
+	case arrow.STRING:
+		return array.NewStringBuilder(pool)
+	case arrow.INT64:
+		return array.NewInt64Builder(pool)
+	case arrow.FLOAT64:
+		return array.NewFloat64Builder(pool)
+	case arrow.BOOL:
+		return array.NewBooleanBuilder(pool)
+	default:
+		return array.NewStringBuilder(pool) // Fallback to string
+	}
+}
+
+// appendValueFromSeries appends value from series to appropriate builder
+func appendValueFromSeries(builder array.Builder, series *core.Series, index int) error {
+	if series.IsNull(index) {
+		builder.AppendNull()
+		return nil
+	}
+
+	switch b := builder.(type) {
+	case *array.StringBuilder:
+		val, err := series.GetString(index)
+		if err != nil {
+			return err
+		}
+		b.Append(val)
+	case *array.Int64Builder:
+		val, err := series.GetInt64(index)
+		if err != nil {
+			return err
+		}
+		b.Append(val)
+	case *array.Float64Builder:
+		val, err := series.GetFloat64(index)
+		if err != nil {
+			return err
+		}
+		b.Append(val)
+	case *array.BooleanBuilder:
+		val, err := series.GetBool(index)
+		if err != nil {
+			return err
+		}
+		b.Append(val)
+	default:
+		return fmt.Errorf("unsupported builder type")
+	}
+	return nil
 }

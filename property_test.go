@@ -166,66 +166,53 @@ func TestPropertyGroupByAggregationConsistency(t *testing.T) {
 	properties.TestingRun(t)
 }
 
-// TestPropertyFilterCommutativity verifies that filter order doesn't matter
-func TestPropertyFilterCommutativity_DISABLED(t *testing.T) {
-	properties := gopter.NewProperties(nil)
+// TestFilterCommutativity verifies that filter order doesn't matter
+func TestFilterCommutativity(t *testing.T) {
+	// Create test data with known values
+	rows := []testRow{
+		{ID: 1, Name: "Alice", Value: 10.0, Category: "A"},
+		{ID: 2, Name: "Bob", Value: 20.0, Category: "B"},
+		{ID: 3, Name: "Charlie", Value: 30.0, Category: "A"},
+		{ID: 4, Name: "David", Value: 40.0, Category: "B"},
+		{ID: 5, Name: "Eve", Value: 50.0, Category: "A"},
+		{ID: 6, Name: "Frank", Value: 60.0, Category: "B"},
+	}
 
-	properties.Property("Filter operations are commutative", prop.ForAll(
-		func(data []testRow) bool {
-			if len(data) < 2 {
-				return true // Skip small data sets
-			}
+	df := createDataFrameFromTestRows(rows)
+	defer df.Release()
 
-			df := createDataFrameFromTestRows(data)
-			defer df.Release()
+	// Apply filters in different orders
+	result1 := df.
+		Filter(Col("value").Gt(Lit(25.0))).
+		Filter(Col("value").Lt(Lit(55.0)))
+	defer result1.Release()
 
-			// Use fixed, safe thresholds based on data distribution
-			// Find min and max values to create a meaningful range
-			var minVal, maxVal float64
-			if len(data) > 0 {
-				minVal = data[0].Value
-				maxVal = data[0].Value
-				for _, row := range data {
-					if row.Value < minVal {
-						minVal = row.Value
-					}
-					if row.Value > maxVal {
-						maxVal = row.Value
-					}
-				}
-			}
+	result2 := df.
+		Filter(Col("value").Lt(Lit(55.0))).
+		Filter(Col("value").Gt(Lit(25.0)))
+	defer result2.Release()
 
-			// Use quartile values for stable testing
-			range_ := maxVal - minVal
-			if range_ < 1e-6 {
-				return true // Skip if all values are essentially the same
-			}
+	if result1.Err() != nil {
+		t.Fatalf("First filter sequence failed: %v", result1.Err())
+	}
 
-			threshold1 := minVal + range_*0.25
-			threshold2 := minVal + range_*0.75
+	if result2.Err() != nil {
+		t.Fatalf("Second filter sequence failed: %v", result2.Err())
+	}
 
-			// Apply filters in different orders
-			result1 := df.
-				Filter(Col("value").Gt(Lit(threshold1))).
-				Filter(Col("value").Lt(Lit(threshold2)))
-			defer result1.Release()
+	// Results should have same number of rows (30, 40, 50)
+	expectedRows := int64(3)
+	if result1.NumRows() != expectedRows {
+		t.Errorf("First filter result: expected %d rows, got %d", expectedRows, result1.NumRows())
+	}
 
-			result2 := df.
-				Filter(Col("value").Lt(Lit(threshold2))).
-				Filter(Col("value").Gt(Lit(threshold1)))
-			defer result2.Release()
+	if result2.NumRows() != expectedRows {
+		t.Errorf("Second filter result: expected %d rows, got %d", expectedRows, result2.NumRows())
+	}
 
-			if result1.Err() != nil || result2.Err() != nil {
-				return false
-			}
-
-			// Results should have same number of rows
-			return result1.NumRows() == result2.NumRows()
-		},
-		gen.SliceOfN(20, genTestRow()), // Use fixed-size slices for stability
-	))
-
-	properties.TestingRun(t)
+	if result1.NumRows() != result2.NumRows() {
+		t.Errorf("Filter results differ: %d vs %d", result1.NumRows(), result2.NumRows())
+	}
 }
 
 // TestPropertyParquetRoundTrip verifies data integrity through Parquet I/O

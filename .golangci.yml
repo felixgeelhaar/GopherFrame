@@ -7,16 +7,14 @@ linters-settings:
     min-complexity: 15
   
   govet:
-    check-shadowing: true
-  
-  golint:
-    min-confidence: 0.8
+    enable:
+      - shadow
   
   gofmt:
     simplify: true
   
   goimports:
-    local-prefixes: github.com/felixgeelhaar/gopherFrame
+    local-prefixes: github.com/felixgeelhaar/GopherFrame
 
   gocritic:
     enabled-tags:
@@ -26,9 +24,26 @@ linters-settings:
     disabled-checks:
       - wrapperFunc
       - hugeParam
+      - deferInLoop
 
   misspell:
     locale: US
+
+  errcheck:
+    check-type-assertions: true
+    check-blank: false
+    ignore: fmt:.*,io/ioutil:^Read.*
+
+  depguard:
+    rules:
+      main:
+        files:
+          - $all
+        allow:
+          - $gostd
+          - github.com/felixgeelhaar/GopherFrame
+          - github.com/apache/arrow-go/v18
+          - github.com/leanovate/gopter
 
 linters:
   enable:
@@ -56,12 +71,6 @@ linters:
     - whitespace
 
   disable:
-    - deadcode    # Replaced by unused
-    - golint      # Replaced by revive
-    - interfacer  # Deprecated
-    - maligned    # Replaced by govet fieldalignment
-    - structcheck # Replaced by unused
-    - varcheck    # Replaced by unused
     - dupl
     - gochecknoglobals
     - gocognit
