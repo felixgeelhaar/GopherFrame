@@ -72,8 +72,27 @@ func main() {
 
 ### Prerequisites
 
-- Go 1.21+
+- Go 1.22+
 - Apache Arrow Go v18.0.0 (automatically managed)
+
+### Quick Setup
+
+```bash
+# Clone and setup development environment
+git clone https://github.com/felixgeelhaar/gopherFrame.git
+cd gopherFrame
+
+# Install pre-commit hooks and development tools
+./scripts/setup-hooks.sh
+
+# Verify installation
+go test ./...
+```
+
+The setup script installs:
+- Pre-commit hooks (automatic formatting and linting)
+- golangci-lint (code quality)
+- goimports (import management)
 
 ### Building
 
