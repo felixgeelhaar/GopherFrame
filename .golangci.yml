@@ -33,7 +33,6 @@ linters-settings:
 linters:
   enable:
     - bodyclose
-    - deadcode
     - depguard
     - dogsled
     - errcheck
@@ -43,24 +42,26 @@ linters:
     - gocyclo
     - gofmt
     - goimports
-    - golint
     - gosimple
     - govet
     - ineffassign
-    - interfacer
-    - maligned
     - misspell
     - nakedret
+    - revive
     - staticcheck
-    - structcheck
     - typecheck
     - unconvert
     - unparam
     - unused
-    - varcheck
     - whitespace
 
   disable:
+    - deadcode    # Replaced by unused
+    - golint      # Replaced by revive
+    - interfacer  # Deprecated
+    - maligned    # Replaced by govet fieldalignment
+    - structcheck # Replaced by unused
+    - varcheck    # Replaced by unused
     - dupl
     - gochecknoglobals
     - gocognit

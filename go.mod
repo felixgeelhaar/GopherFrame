@@ -2,7 +2,10 @@ module github.com/felixgeelhaar/gopherFrame
 
 go 1.24.4
 
-require github.com/apache/arrow-go/v18 v18.0.0
+require (
+	github.com/apache/arrow-go/v18 v18.0.0
+	github.com/leanovate/gopter v0.2.11
+)
 
 require (
 	github.com/JohnCGriffin/overflow v0.0.0-20211019200055-46fa312c352c // indirect
@@ -14,7 +17,6 @@ require (
 	github.com/klauspost/asmfmt v1.3.2 // indirect
 	github.com/klauspost/compress v1.17.11 // indirect
 	github.com/klauspost/cpuid/v2 v2.2.8 // indirect
-	github.com/leanovate/gopter v0.2.11 // indirect
 	github.com/minio/asm2plan9s v0.0.0-20200509001527-cdd76441f9d8 // indirect
 	github.com/minio/c2goasm v0.0.0-20190812172519-36a3d3bbc4f3 // indirect
 	github.com/pierrec/lz4/v4 v4.1.21 // indirect
