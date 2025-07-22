@@ -10,7 +10,7 @@ import (
 	"github.com/apache/arrow-go/v18/arrow"
 	"github.com/apache/arrow-go/v18/arrow/array"
 	"github.com/apache/arrow-go/v18/arrow/memory"
-	"github.com/felixgeelhaar/gopherFrame/pkg/storage"
+	"github.com/felixgeelhaar/GopherFrame/pkg/storage"
 )
 
 // DataFrame is the internal, immutable representation of tabular data.
@@ -181,19 +181,19 @@ func (df *DataFrame) Equal(other *DataFrame) bool {
 	if !df.record.Schema().Equal(other.record.Schema()) {
 		return false
 	}
-	
+
 	// Compare number of rows
 	if df.record.NumRows() != other.record.NumRows() {
 		return false
 	}
-	
+
 	// Compare each column
 	for i := 0; i < int(df.record.NumCols()); i++ {
 		if !array.Equal(df.record.Column(i), other.record.Column(i)) {
 			return false
 		}
 	}
-	
+
 	return true
 }
 
@@ -206,19 +206,19 @@ func (df *DataFrame) Validate() error {
 	// Validate schema and columns consistency
 	schema := df.record.Schema()
 	if int(df.record.NumCols()) != len(schema.Fields()) {
-		return fmt.Errorf("column count mismatch: record has %d columns, schema has %d fields", 
+		return fmt.Errorf("column count mismatch: record has %d columns, schema has %d fields",
 			df.record.NumCols(), len(schema.Fields()))
 	}
-	
+
 	// Validate each column against its field type
 	for i, field := range schema.Fields() {
 		column := df.record.Column(i)
 		if !arrow.TypeEqual(column.DataType(), field.Type) {
-			return fmt.Errorf("column %d type mismatch: expected %s, got %s", 
+			return fmt.Errorf("column %d type mismatch: expected %s, got %s",
 				i, field.Type, column.DataType())
 		}
 	}
-	
+
 	return nil
 }
 
@@ -267,13 +267,13 @@ func (df *DataFrame) Select(columnNames []string) (*DataFrame, error) {
 	if len(columnNames) == 0 {
 		return nil, fmt.Errorf("no columns specified for selection")
 	}
-	
+
 	schema := df.record.Schema()
-	
+
 	// Find column indices and validate columns exist
 	indices := make([]int, len(columnNames))
 	selectedFields := make([]arrow.Field, len(columnNames))
-	
+
 	for i, name := range columnNames {
 		fieldIndex := -1
 		for j, field := range schema.Fields() {
@@ -283,16 +283,16 @@ func (df *DataFrame) Select(columnNames []string) (*DataFrame, error) {
 				break
 			}
 		}
-		
+
 		if fieldIndex == -1 {
 			return nil, fmt.Errorf("column not found: %s", name)
 		}
 		indices[i] = fieldIndex
 	}
-	
+
 	// Create new schema with selected fields
 	newSchema := arrow.NewSchema(selectedFields, nil)
-	
+
 	// Extract selected columns
 	selectedColumns := make([]arrow.Array, len(indices))
 	for i, idx := range indices {
@@ -300,10 +300,10 @@ func (df *DataFrame) Select(columnNames []string) (*DataFrame, error) {
 		column.Retain() // Retain reference for new record
 		selectedColumns[i] = column
 	}
-	
+
 	// Create new record with selected columns
 	newRecord := array.NewRecord(newSchema, selectedColumns, df.record.NumRows())
-	
+
 	return NewDataFrame(newRecord), nil
 }
 
@@ -312,16 +312,16 @@ func (df *DataFrame) WithColumn(columnName string, newColumn arrow.Array) (*Data
 	if newColumn == nil {
 		return nil, fmt.Errorf("new column cannot be nil")
 	}
-	
+
 	// Validate column length matches DataFrame
 	if int64(newColumn.Len()) != df.NumRows() {
 		return nil, fmt.Errorf("column length %d does not match DataFrame rows %d", newColumn.Len(), df.NumRows())
 	}
-	
+
 	newColumn.Retain() // Take ownership
-	
+
 	schema := df.record.Schema()
-	
+
 	// Check if column already exists
 	existingColumnIndex := -1
 	for i, field := range schema.Fields() {
@@ -330,15 +330,15 @@ func (df *DataFrame) WithColumn(columnName string, newColumn arrow.Array) (*Data
 			break
 		}
 	}
-	
+
 	var newFields []arrow.Field
 	var newColumns []arrow.Array
-	
+
 	if existingColumnIndex >= 0 {
 		// Replace existing column
 		newFields = make([]arrow.Field, len(schema.Fields()))
 		newColumns = make([]arrow.Array, len(schema.Fields()))
-		
+
 		for i, field := range schema.Fields() {
 			if i == existingColumnIndex {
 				// Replace with new column
@@ -356,7 +356,7 @@ func (df *DataFrame) WithColumn(columnName string, newColumn arrow.Array) (*Data
 		// Add new column
 		newFields = make([]arrow.Field, len(schema.Fields())+1)
 		newColumns = make([]arrow.Array, len(schema.Fields())+1)
-		
+
 		// Copy existing fields and columns
 		for i, field := range schema.Fields() {
 			newFields[i] = field
@@ -364,16 +364,16 @@ func (df *DataFrame) WithColumn(columnName string, newColumn arrow.Array) (*Data
 			column.Retain()
 			newColumns[i] = column
 		}
-		
+
 		// Add new column
 		newFields[len(schema.Fields())] = arrow.Field{Name: columnName, Type: newColumn.DataType()}
 		newColumns[len(schema.Fields())] = newColumn
 	}
-	
+
 	// Create new schema and record
 	newSchema := arrow.NewSchema(newFields, nil)
 	newRecord := array.NewRecord(newSchema, newColumns, df.record.NumRows())
-	
+
 	return NewDataFrame(newRecord), nil
 }
 
@@ -383,17 +383,17 @@ func (df *DataFrame) Filter(predicateArray arrow.Array) (*DataFrame, error) {
 	if predicateArray.DataType().ID() != arrow.BOOL {
 		return nil, fmt.Errorf("filter predicate must be boolean array, got %s", predicateArray.DataType())
 	}
-	
+
 	// Validate length matches DataFrame
 	if int64(predicateArray.Len()) != df.NumRows() {
 		return nil, fmt.Errorf("predicate length %d does not match DataFrame rows %d", predicateArray.Len(), df.NumRows())
 	}
-	
+
 	boolArray, ok := predicateArray.(*array.Boolean)
 	if !ok {
 		return nil, fmt.Errorf("failed to cast predicate to boolean array")
 	}
-	
+
 	// Count true values to determine result size
 	trueCount := int64(0)
 	for i := 0; i < boolArray.Len(); i++ {
@@ -401,12 +401,12 @@ func (df *DataFrame) Filter(predicateArray arrow.Array) (*DataFrame, error) {
 			trueCount++
 		}
 	}
-	
+
 	if trueCount == 0 {
 		// Return empty DataFrame with same schema
 		schema := df.record.Schema()
 		emptyColumns := make([]arrow.Array, len(schema.Fields()))
-		
+
 		pool := memory.NewGoAllocator()
 		for i, field := range schema.Fields() {
 			switch field.Type.ID() {
@@ -426,24 +426,24 @@ func (df *DataFrame) Filter(predicateArray arrow.Array) (*DataFrame, error) {
 				return nil, fmt.Errorf("unsupported data type for empty filter: %s", field.Type)
 			}
 		}
-		
+
 		emptyRecord := array.NewRecord(schema, emptyColumns, 0)
 		return NewDataFrame(emptyRecord), nil
 	}
-	
+
 	// Create filtered columns
 	schema := df.record.Schema()
 	filteredColumns := make([]arrow.Array, len(schema.Fields()))
-	
+
 	pool := memory.NewGoAllocator()
 	for colIdx, field := range schema.Fields() {
 		column := df.record.Column(colIdx)
-		
+
 		switch field.Type.ID() {
 		case arrow.INT64:
 			srcArray := column.(*array.Int64)
 			builder := array.NewInt64Builder(pool)
-			
+
 			for i := 0; i < boolArray.Len(); i++ {
 				if !boolArray.IsNull(i) && boolArray.Value(i) {
 					if srcArray.IsNull(i) {
@@ -455,11 +455,11 @@ func (df *DataFrame) Filter(predicateArray arrow.Array) (*DataFrame, error) {
 			}
 			filteredColumns[colIdx] = builder.NewArray()
 			builder.Release()
-			
+
 		case arrow.FLOAT64:
 			srcArray := column.(*array.Float64)
 			builder := array.NewFloat64Builder(pool)
-			
+
 			for i := 0; i < boolArray.Len(); i++ {
 				if !boolArray.IsNull(i) && boolArray.Value(i) {
 					if srcArray.IsNull(i) {
@@ -471,11 +471,11 @@ func (df *DataFrame) Filter(predicateArray arrow.Array) (*DataFrame, error) {
 			}
 			filteredColumns[colIdx] = builder.NewArray()
 			builder.Release()
-			
+
 		case arrow.STRING:
 			srcArray := column.(*array.String)
 			builder := array.NewStringBuilder(pool)
-			
+
 			for i := 0; i < boolArray.Len(); i++ {
 				if !boolArray.IsNull(i) && boolArray.Value(i) {
 					if srcArray.IsNull(i) {
@@ -487,12 +487,12 @@ func (df *DataFrame) Filter(predicateArray arrow.Array) (*DataFrame, error) {
 			}
 			filteredColumns[colIdx] = builder.NewArray()
 			builder.Release()
-			
+
 		default:
 			return nil, fmt.Errorf("unsupported data type for filtering: %s", field.Type)
 		}
 	}
-	
+
 	// Create new record with filtered data
 	filteredRecord := array.NewRecord(schema, filteredColumns, trueCount)
 	return NewDataFrame(filteredRecord), nil

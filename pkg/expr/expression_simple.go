@@ -9,20 +9,20 @@ import (
 	"github.com/apache/arrow-go/v18/arrow"
 	"github.com/apache/arrow-go/v18/arrow/array"
 	"github.com/apache/arrow-go/v18/arrow/memory"
-	"github.com/felixgeelhaar/gopherFrame/pkg/core"
+	"github.com/felixgeelhaar/GopherFrame/pkg/core"
 )
 
 // Expr is the interface that all expression types must implement.
 type Expr interface {
 	// Evaluate executes the expression against a DataFrame and returns the result.
 	Evaluate(df *core.DataFrame) (arrow.Array, error)
-	
+
 	// Name returns the output name of this expression.
 	Name() string
-	
+
 	// String returns a string representation for debugging.
 	String() string
-	
+
 	// Fluent methods for building expressions
 	Add(other Expr) Expr
 	Sub(other Expr) Expr
@@ -54,7 +54,7 @@ func (c *ColumnExpr) Evaluate(df *core.DataFrame) (arrow.Array, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to get column %s: %w", c.columnName, err)
 	}
-	
+
 	// Return a copy of the array to maintain immutability
 	arr := series.Array()
 	arr.Retain()
@@ -126,13 +126,13 @@ func Lit(value interface{}) Expr {
 func (l *LiteralExpr) Evaluate(df *core.DataFrame) (arrow.Array, error) {
 	numRows := int(df.NumRows())
 	pool := memory.NewGoAllocator()
-	
+
 	// Create an array filled with the literal value
 	switch l.dataType.ID() {
 	case arrow.INT64:
 		builder := array.NewInt64Builder(pool)
 		defer builder.Release()
-		
+
 		intVal, ok := l.value.(int64)
 		if !ok {
 			// Try to convert int to int64
@@ -142,54 +142,54 @@ func (l *LiteralExpr) Evaluate(df *core.DataFrame) (arrow.Array, error) {
 				return nil, fmt.Errorf("type mismatch: expected int64, got %T", l.value)
 			}
 		}
-		
+
 		for i := 0; i < numRows; i++ {
 			builder.Append(intVal)
 		}
 		return builder.NewArray(), nil
-		
+
 	case arrow.FLOAT64:
 		builder := array.NewFloat64Builder(pool)
 		defer builder.Release()
-		
+
 		floatVal, ok := l.value.(float64)
 		if !ok {
 			return nil, fmt.Errorf("type mismatch: expected float64, got %T", l.value)
 		}
-		
+
 		for i := 0; i < numRows; i++ {
 			builder.Append(floatVal)
 		}
 		return builder.NewArray(), nil
-		
+
 	case arrow.STRING:
 		builder := array.NewStringBuilder(pool)
 		defer builder.Release()
-		
+
 		strVal, ok := l.value.(string)
 		if !ok {
 			return nil, fmt.Errorf("type mismatch: expected string, got %T", l.value)
 		}
-		
+
 		for i := 0; i < numRows; i++ {
 			builder.Append(strVal)
 		}
 		return builder.NewArray(), nil
-		
+
 	case arrow.BOOL:
 		builder := array.NewBooleanBuilder(pool)
 		defer builder.Release()
-		
+
 		boolVal, ok := l.value.(bool)
 		if !ok {
 			return nil, fmt.Errorf("type mismatch: expected bool, got %T", l.value)
 		}
-		
+
 		for i := 0; i < numRows; i++ {
 			builder.Append(boolVal)
 		}
 		return builder.NewArray(), nil
-		
+
 	default:
 		return nil, fmt.Errorf("unsupported literal type: %s", l.dataType)
 	}
@@ -258,13 +258,13 @@ func (b *BinaryExpr) Evaluate(df *core.DataFrame) (arrow.Array, error) {
 		return nil, fmt.Errorf("failed to evaluate left operand: %w", err)
 	}
 	defer leftArray.Release()
-	
+
 	rightArray, err := b.right.Evaluate(df)
 	if err != nil {
 		return nil, fmt.Errorf("failed to evaluate right operand: %w", err)
 	}
 	defer rightArray.Release()
-	
+
 	// Implement basic binary operations
 	switch b.operator {
 	case "greater":
@@ -291,16 +291,16 @@ func (b *BinaryExpr) evaluateGreater(left, right arrow.Array) (arrow.Array, erro
 	if left.Len() != right.Len() {
 		return nil, fmt.Errorf("array length mismatch: %d vs %d", left.Len(), right.Len())
 	}
-	
+
 	pool := memory.NewGoAllocator()
 	builder := array.NewBooleanBuilder(pool)
 	defer builder.Release()
-	
+
 	// Handle Float64 comparisons (most common case for our test)
 	if left.DataType().ID() == arrow.FLOAT64 && right.DataType().ID() == arrow.FLOAT64 {
 		leftFloat := left.(*array.Float64)
 		rightFloat := right.(*array.Float64)
-		
+
 		for i := 0; i < left.Len(); i++ {
 			if leftFloat.IsNull(i) || rightFloat.IsNull(i) {
 				builder.AppendNull()
@@ -308,15 +308,15 @@ func (b *BinaryExpr) evaluateGreater(left, right arrow.Array) (arrow.Array, erro
 				builder.Append(leftFloat.Value(i) > rightFloat.Value(i))
 			}
 		}
-		
+
 		return builder.NewArray(), nil
 	}
-	
+
 	// Handle Int64 comparisons
 	if left.DataType().ID() == arrow.INT64 && right.DataType().ID() == arrow.INT64 {
 		leftInt := left.(*array.Int64)
 		rightInt := right.(*array.Int64)
-		
+
 		for i := 0; i < left.Len(); i++ {
 			if leftInt.IsNull(i) || rightInt.IsNull(i) {
 				builder.AppendNull()
@@ -324,10 +324,10 @@ func (b *BinaryExpr) evaluateGreater(left, right arrow.Array) (arrow.Array, erro
 				builder.Append(leftInt.Value(i) > rightInt.Value(i))
 			}
 		}
-		
+
 		return builder.NewArray(), nil
 	}
-	
+
 	return nil, fmt.Errorf("unsupported types for greater comparison: %s > %s", left.DataType(), right.DataType())
 }
 
@@ -352,17 +352,17 @@ func (b *BinaryExpr) evaluateMultiply(left, right arrow.Array) (arrow.Array, err
 	if left.Len() != right.Len() {
 		return nil, fmt.Errorf("array length mismatch: %d vs %d", left.Len(), right.Len())
 	}
-	
+
 	pool := memory.NewGoAllocator()
-	
+
 	// Handle Float64 multiplication
 	if left.DataType().ID() == arrow.FLOAT64 && right.DataType().ID() == arrow.FLOAT64 {
 		builder := array.NewFloat64Builder(pool)
 		defer builder.Release()
-		
+
 		leftFloat := left.(*array.Float64)
 		rightFloat := right.(*array.Float64)
-		
+
 		for i := 0; i < left.Len(); i++ {
 			if leftFloat.IsNull(i) || rightFloat.IsNull(i) {
 				builder.AppendNull()
@@ -370,10 +370,10 @@ func (b *BinaryExpr) evaluateMultiply(left, right arrow.Array) (arrow.Array, err
 				builder.Append(leftFloat.Value(i) * rightFloat.Value(i))
 			}
 		}
-		
+
 		return builder.NewArray(), nil
 	}
-	
+
 	return nil, fmt.Errorf("unsupported types for multiply: %s * %s", left.DataType(), right.DataType())
 }
 

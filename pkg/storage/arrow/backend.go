@@ -11,7 +11,7 @@ import (
 
 	"github.com/apache/arrow-go/v18/arrow"
 	"github.com/apache/arrow-go/v18/arrow/ipc"
-	"github.com/felixgeelhaar/gopherFrame/pkg/storage"
+	"github.com/felixgeelhaar/GopherFrame/pkg/storage"
 )
 
 // Backend implements storage.Backend for Apache Arrow IPC format.

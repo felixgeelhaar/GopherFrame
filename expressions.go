@@ -2,7 +2,7 @@
 package gopherframe
 
 import (
-	"github.com/felixgeelhaar/gopherFrame/pkg/expr"
+	"github.com/felixgeelhaar/GopherFrame/pkg/expr"
 )
 
 // Col creates a column reference expression.
@@ -25,7 +25,7 @@ type ColumnExpr interface {
 	expr.Expr
 	// Add creates an addition expression
 	Add(other expr.Expr) expr.Expr
-	// Sub creates a subtraction expression  
+	// Sub creates a subtraction expression
 	Sub(other expr.Expr) expr.Expr
 	// Mul creates a multiplication expression
 	Mul(other expr.Expr) expr.Expr

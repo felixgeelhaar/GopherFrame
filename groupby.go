@@ -8,14 +8,14 @@ import (
 	"github.com/apache/arrow-go/v18/arrow"
 	"github.com/apache/arrow-go/v18/arrow/array"
 	"github.com/apache/arrow-go/v18/arrow/memory"
-	"github.com/felixgeelhaar/gopherFrame/pkg/core"
+	"github.com/felixgeelhaar/GopherFrame/pkg/core"
 )
 
 // GroupedDataFrame represents a DataFrame grouped by one or more columns.
 type GroupedDataFrame struct {
-	df         *DataFrame
+	df          *DataFrame
 	groupByCols []string
-	err        error
+	err         error
 }
 
 // Aggregation represents an aggregation operation on a column.
@@ -30,18 +30,18 @@ func (df *DataFrame) GroupBy(columns ...string) *GroupedDataFrame {
 	if df.err != nil {
 		return &GroupedDataFrame{err: df.err}
 	}
-	
+
 	if len(columns) == 0 {
 		return &GroupedDataFrame{err: fmt.Errorf("no columns specified for groupby")}
 	}
-	
+
 	// Validate all columns exist
 	for _, col := range columns {
 		if !df.HasColumn(col) {
 			return &GroupedDataFrame{err: fmt.Errorf("column not found: %s", col)}
 		}
 	}
-	
+
 	return &GroupedDataFrame{
 		df:          df,
 		groupByCols: columns,
@@ -53,17 +53,17 @@ func (gdf *GroupedDataFrame) Agg(aggregations ...Aggregation) *DataFrame {
 	if gdf.err != nil {
 		return &DataFrame{err: gdf.err}
 	}
-	
+
 	if len(aggregations) == 0 {
 		return &DataFrame{err: fmt.Errorf("no aggregations specified")}
 	}
-	
+
 	// For now, implement a simple groupby for single column with basic aggregations
 	result, err := gdf.performGroupBy(aggregations)
 	if err != nil {
 		return &DataFrame{err: err}
 	}
-	
+
 	return result
 }
 
@@ -71,46 +71,46 @@ func (gdf *GroupedDataFrame) Agg(aggregations ...Aggregation) *DataFrame {
 func (gdf *GroupedDataFrame) performGroupBy(aggregations []Aggregation) (*DataFrame, error) {
 	// This is a simplified implementation for demonstration
 	// A production implementation would use Arrow compute kernels for efficiency
-	
+
 	if len(gdf.groupByCols) != 1 {
 		return nil, fmt.Errorf("multi-column groupby not yet implemented")
 	}
-	
+
 	groupCol := gdf.groupByCols[0]
-	
+
 	// Get the grouping column
 	groupSeries, err := gdf.df.coreDF.Column(groupCol)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get group column: %w", err)
 	}
 	defer groupSeries.Release()
-	
+
 	// Extract unique groups and build group indices
 	groups, groupIndices, err := gdf.extractGroups(groupSeries)
 	if err != nil {
 		return nil, fmt.Errorf("failed to extract groups: %w", err)
 	}
-	
+
 	// Build result columns
 	// First column: group keys
 	resultFields := []arrow.Field{{Name: groupCol, Type: groupSeries.DataType()}}
 	resultColumns := []arrow.Array{groups}
-	
+
 	// Add aggregation columns
 	for _, agg := range aggregations {
 		aggField, aggColumn, err := gdf.performAggregation(agg, groupIndices)
 		if err != nil {
 			return nil, fmt.Errorf("failed to perform aggregation %s: %w", agg.Name(), err)
 		}
-		
+
 		resultFields = append(resultFields, aggField)
 		resultColumns = append(resultColumns, aggColumn)
 	}
-	
+
 	// Create result schema and record
 	resultSchema := arrow.NewSchema(resultFields, nil)
 	resultRecord := array.NewRecord(resultSchema, resultColumns, int64(groups.Len()))
-	
+
 	return NewDataFrame(resultRecord), nil
 }
 
@@ -118,39 +118,39 @@ func (gdf *GroupedDataFrame) performGroupBy(aggregations []Aggregation) (*DataFr
 func (gdf *GroupedDataFrame) extractGroups(groupSeries *core.Series) (arrow.Array, map[string][]int, error) {
 	// Build map of group value to row indices
 	groupMap := make(map[string][]int)
-	
+
 	for i := 0; i < groupSeries.Len(); i++ {
 		if groupSeries.IsNull(i) {
 			continue // Skip null values for now
 		}
-		
+
 		value, err := groupSeries.GetString(i)
 		if err != nil {
 			return nil, nil, fmt.Errorf("failed to get string value: %w", err)
 		}
-		
+
 		groupMap[value] = append(groupMap[value], i)
 	}
-	
+
 	// Sort group keys for consistent output
 	var groupKeys []string
 	for key := range groupMap {
 		groupKeys = append(groupKeys, key)
 	}
 	sort.Strings(groupKeys)
-	
+
 	// Build result array of group keys
 	pool := memory.NewGoAllocator()
 	builder := array.NewStringBuilder(pool)
 	defer builder.Release()
-	
+
 	// Reorganize indices by sorted keys
 	sortedIndices := make(map[string][]int)
 	for _, key := range groupKeys {
 		builder.Append(key)
 		sortedIndices[key] = groupMap[key]
 	}
-	
+
 	groupArray := builder.NewArray()
 	return groupArray, sortedIndices, nil
 }
@@ -163,9 +163,9 @@ func (gdf *GroupedDataFrame) performAggregation(agg Aggregation, groupIndices ma
 		return arrow.Field{}, nil, fmt.Errorf("failed to get aggregation column: %w", err)
 	}
 	defer aggSeries.Release()
-	
+
 	pool := memory.NewGoAllocator()
-	
+
 	switch agg.operation {
 	case "sum":
 		return gdf.performSum(aggSeries, groupIndices, agg.Name(), pool)
@@ -187,21 +187,21 @@ func (gdf *GroupedDataFrame) performSum(series *core.Series, groupIndices map[st
 	if series.DataType().ID() != arrow.FLOAT64 {
 		return arrow.Field{}, nil, fmt.Errorf("sum aggregation only supports float64, got %s", series.DataType())
 	}
-	
+
 	builder := array.NewFloat64Builder(pool)
 	defer builder.Release()
-	
+
 	// Sort keys to maintain consistent order
 	var keys []string
 	for key := range groupIndices {
 		keys = append(keys, key)
 	}
 	sort.Strings(keys)
-	
+
 	for _, key := range keys {
 		indices := groupIndices[key]
 		sum := 0.0
-		
+
 		for _, idx := range indices {
 			if !series.IsNull(idx) {
 				val, err := series.GetFloat64(idx)
@@ -211,10 +211,10 @@ func (gdf *GroupedDataFrame) performSum(series *core.Series, groupIndices map[st
 				sum += val
 			}
 		}
-		
+
 		builder.Append(sum)
 	}
-	
+
 	field := arrow.Field{Name: name, Type: arrow.PrimitiveTypes.Float64}
 	return field, builder.NewArray(), nil
 }
@@ -227,31 +227,31 @@ func (gdf *GroupedDataFrame) performMean(series *core.Series, groupIndices map[s
 		return arrow.Field{}, nil, err
 	}
 	defer sumArray.Release()
-	
+
 	builder := array.NewFloat64Builder(pool)
 	defer builder.Release()
-	
+
 	sumFloat := sumArray.(*array.Float64)
-	
+
 	// Sort keys to maintain consistent order
 	var keys []string
 	for key := range groupIndices {
 		keys = append(keys, key)
 	}
 	sort.Strings(keys)
-	
+
 	i := 0
 	for _, key := range keys {
 		indices := groupIndices[key]
 		count := 0
-		
+
 		// Count non-null values
 		for _, idx := range indices {
 			if !series.IsNull(idx) {
 				count++
 			}
 		}
-		
+
 		if count > 0 {
 			mean := sumFloat.Value(i) / float64(count)
 			builder.Append(mean)
@@ -260,7 +260,7 @@ func (gdf *GroupedDataFrame) performMean(series *core.Series, groupIndices map[s
 		}
 		i++
 	}
-	
+
 	field := arrow.Field{Name: name, Type: arrow.PrimitiveTypes.Float64}
 	return field, builder.NewArray(), nil
 }
@@ -269,71 +269,71 @@ func (gdf *GroupedDataFrame) performMean(series *core.Series, groupIndices map[s
 func (gdf *GroupedDataFrame) performCount(series *core.Series, groupIndices map[string][]int, name string, pool memory.Allocator) (arrow.Field, arrow.Array, error) {
 	builder := array.NewInt64Builder(pool)
 	defer builder.Release()
-	
+
 	// Sort keys to maintain consistent order
 	var keys []string
 	for key := range groupIndices {
 		keys = append(keys, key)
 	}
 	sort.Strings(keys)
-	
+
 	for _, key := range keys {
 		indices := groupIndices[key]
 		count := int64(0)
-		
+
 		for _, idx := range indices {
 			if !series.IsNull(idx) {
 				count++
 			}
 		}
-		
+
 		builder.Append(count)
 	}
-	
+
 	field := arrow.Field{Name: name, Type: arrow.PrimitiveTypes.Int64}
 	return field, builder.NewArray(), nil
 }
 
-// performMin finds minimum value for each group  
+// performMin finds minimum value for each group
 func (gdf *GroupedDataFrame) performMin(series *core.Series, groupIndices map[string][]int, name string, pool memory.Allocator) (arrow.Field, arrow.Array, error) {
 	if series.DataType().ID() != arrow.FLOAT64 {
 		return arrow.Field{}, nil, fmt.Errorf("min aggregation only supports float64, got %s", series.DataType())
 	}
-	
+
 	builder := array.NewFloat64Builder(pool)
 	defer builder.Release()
-	
+
 	// Sort keys to maintain consistent order
 	var keys []string
 	for key := range groupIndices {
 		keys = append(keys, key)
 	}
 	sort.Strings(keys)
-	
+
 	for _, key := range keys {
 		indices := groupIndices[key]
 		var min *float64
-		
+
 		for _, idx := range indices {
 			if !series.IsNull(idx) {
 				val, err := series.GetFloat64(idx)
 				if err != nil {
 					return arrow.Field{}, nil, fmt.Errorf("failed to get float64 value: %w", err)
 				}
-				
+
 				if min == nil || val < *min {
 					min = &val
 				}
 			}
 		}
-		
+
 		if min != nil {
 			builder.Append(*min)
 		} else {
 			builder.AppendNull()
 		}
 	}
-	
+
 	field := arrow.Field{Name: name, Type: arrow.PrimitiveTypes.Float64}
 	return field, builder.NewArray(), nil
 }
@@ -343,41 +343,41 @@ func (gdf *GroupedDataFrame) performMax(series *core.Series, groupIndices map[st
 	if series.DataType().ID() != arrow.FLOAT64 {
 		return arrow.Field{}, nil, fmt.Errorf("max aggregation only supports float64, got %s", series.DataType())
 	}
-	
+
 	builder := array.NewFloat64Builder(pool)
 	defer builder.Release()
-	
+
 	// Sort keys to maintain consistent order
 	var keys []string
 	for key := range groupIndices {
 		keys = append(keys, key)
 	}
 	sort.Strings(keys)
-	
+
 	for _, key := range keys {
 		indices := groupIndices[key]
 		var max *float64
-		
+
 		for _, idx := range indices {
 			if !series.IsNull(idx) {
 				val, err := series.GetFloat64(idx)
 				if err != nil {
 					return arrow.Field{}, nil, fmt.Errorf("failed to get float64 value: %w", err)
 				}
-				
+
 				if max == nil || val > *max {
 					max = &val
 				}
 			}
 		}
-		
+
 		if max != nil {
 			builder.Append(*max)
 		} else {
 			builder.AppendNull()
 		}
 	}
-	
+
 	field := arrow.Field{Name: name, Type: arrow.PrimitiveTypes.Float64}
 	return field, builder.NewArray(), nil
 }
@@ -397,7 +397,7 @@ func Sum(column string) Aggregation {
 func Mean(column string) Aggregation {
 	return Aggregation{
 		column:    column,
-		operation: "mean", 
+		operation: "mean",
 		alias:     column + "_mean",
 	}
 }
@@ -407,7 +407,7 @@ func Count(column string) Aggregation {
 	return Aggregation{
 		column:    column,
 		operation: "count",
-		alias:     column + "_count", 
+		alias:     column + "_count",
 	}
 }
 

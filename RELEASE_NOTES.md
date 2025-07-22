@@ -35,7 +35,7 @@ GopherFrame v0.1.0 delivers on its promise to provide a production-first DataFra
 
 ### DataFrame Creation
 ```go
-import gf "github.com/felixgeelhaar/gopherFrame"
+import gf "github.com/felixgeelhaar/GopherFrame"
 
 // From Parquet
 df, err := gf.ReadParquet("data.parquet")
@@ -210,7 +210,7 @@ This project follows the same licensing approach as the Go ecosystem.
 ## 🔗 Installation
 
 ```bash
-go get github.com/felixgeelhaar/gopherFrame
+go get github.com/felixgeelhaar/GopherFrame
 ```
 
 ## 📞 Support

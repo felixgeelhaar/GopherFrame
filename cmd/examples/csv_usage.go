@@ -5,7 +5,7 @@ import (
 	"log"
 	"os"
 
-	gf "github.com/felixgeelhaar/gopherFrame"
+	gf "github.com/felixgeelhaar/GopherFrame"
 )
 
 func main() {
@@ -29,7 +29,7 @@ func main() {
 	}
 	defer readDF.Release()
 
-	fmt.Printf("Read DataFrame with %d rows and %d columns\n", 
+	fmt.Printf("Read DataFrame with %d rows and %d columns\n",
 		readDF.NumRows(), readDF.NumCols())
 	fmt.Printf("Columns: %v\n", readDF.ColumnNames())
 
@@ -38,7 +38,7 @@ func main() {
 	result := readDF.
 		Filter(gf.Col("score").Gt(gf.Lit(80.0))).
 		Select("name", "score")
-	
+
 	if result.Err() != nil {
 		log.Fatalf("Operation failed: %v", result.Err())
 	}

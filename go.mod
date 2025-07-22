@@ -1,6 +1,8 @@
-module github.com/felixgeelhaar/gopherFrame
+module github.com/felixgeelhaar/GopherFrame
 
-go 1.24.4
+go 1.22.0
+
+toolchain go1.24.4
 
 require (
 	github.com/apache/arrow-go/v18 v18.0.0

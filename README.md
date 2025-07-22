@@ -35,7 +35,7 @@ Empower Go developers to build fast, reliable, and scalable data engineering pip
 package main
 
 import (
-    "github.com/felixgeelhaar/gopherFrame"
+    "github.com/felixgeelhaar/GopherFrame"
 )
 
 func main() {
@@ -79,7 +79,7 @@ func main() {
 
 ```bash
 # Clone and setup development environment
-git clone https://github.com/felixgeelhaar/gopherFrame.git
+git clone https://github.com/felixgeelhaar/GopherFrame.git
 cd gopherFrame
 
 # Install pre-commit hooks and development tools
@@ -97,7 +97,7 @@ The setup script installs:
 ### Building
 
 ```bash
-git clone https://github.com/felixgeelhaar/gopherFrame.git
+git clone https://github.com/felixgeelhaar/GopherFrame.git
 cd gopherFrame
 go mod tidy
 go build ./...

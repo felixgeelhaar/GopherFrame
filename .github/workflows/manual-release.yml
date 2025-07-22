@@ -55,7 +55,7 @@ jobs:
     - name: Set up Go
       uses: actions/setup-go@v5
       with:
-        go-version: '1.24'
+        go-version: '1.23'
 
     - name: Cache Go modules
       uses: actions/cache@v3
@@ -107,7 +107,7 @@ jobs:
     - name: Set up Go
       uses: actions/setup-go@v5
       with:
-        go-version: '1.24'
+        go-version: '1.23'
 
     - name: Update version references
       run: |
@@ -152,7 +152,7 @@ jobs:
           echo "" >> $GITHUB_OUTPUT
           echo "## Installation" >> $GITHUB_OUTPUT
           echo "\`\`\`bash" >> $GITHUB_OUTPUT
-          echo "go get github.com/felixgeelhaar/gopherFrame@${{ github.event.inputs.version }}" >> $GITHUB_OUTPUT
+          echo "go get github.com/felixgeelhaar/GopherFrame@${{ github.event.inputs.version }}" >> $GITHUB_OUTPUT
           echo "\`\`\`" >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT
         fi
@@ -184,23 +184,23 @@ jobs:
         go mod init test-release
         
         echo "🔍 Testing module download..."
-        go get github.com/felixgeelhaar/gopherFrame@${{ github.event.inputs.version }}
+        go get github.com/felixgeelhaar/GopherFrame@${{ github.event.inputs.version }}
         
         echo "✅ Module downloaded successfully"
-        go list -m github.com/felixgeelhaar/gopherFrame
+        go list -m github.com/felixgeelhaar/GopherFrame
 
     - name: Create test program
       run: |
         cd $(mktemp -d)
         go mod init release-test
-        go get github.com/felixgeelhaar/gopherFrame@${{ github.event.inputs.version }}
+        go get github.com/felixgeelhaar/GopherFrame@${{ github.event.inputs.version }}
         
         cat > main.go << 'EOF'
         package main
         
         import (
             "fmt"
-            gf "github.com/felixgeelhaar/gopherFrame"
+            gf "github.com/felixgeelhaar/GopherFrame"
         )
         
         func main() {

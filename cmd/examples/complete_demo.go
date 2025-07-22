@@ -5,10 +5,10 @@ import (
 	"log"
 	"os"
 
-	gf "github.com/felixgeelhaar/gopherFrame"
 	"github.com/apache/arrow-go/v18/arrow"
 	"github.com/apache/arrow-go/v18/arrow/array"
 	"github.com/apache/arrow-go/v18/arrow/memory"
+	gf "github.com/felixgeelhaar/GopherFrame"
 )
 
 func main() {
@@ -19,13 +19,13 @@ func main() {
 	fmt.Println("\n1. Creating DataFrame...")
 	df := createSampleDataFrame()
 	defer df.Release()
-	
+
 	fmt.Printf("Created DataFrame with %d rows and %d columns\n", df.NumRows(), df.NumCols())
 	fmt.Printf("Columns: %v\n", df.ColumnNames())
 
 	// 2. Basic operations
 	fmt.Println("\n2. Basic Operations...")
-	
+
 	// Filter operation
 	highScores := df.Filter(gf.Col("score").Gt(gf.Lit(85.0)))
 	defer highScores.Release()
@@ -48,7 +48,7 @@ func main() {
 		WithColumn("grade", gf.Col("score").Div(gf.Lit(10.0))).
 		Select("name", "department", "score", "grade")
 	defer result.Release()
-	
+
 	fmt.Printf("Chained result: %d rows, %d columns\n", result.NumRows(), result.NumCols())
 
 	// 4. GroupBy and Aggregation
@@ -61,13 +61,13 @@ func main() {
 		gf.Min("score").As("min_score"),
 	)
 	defer groupedResults.Release()
-	
+
 	fmt.Printf("Department stats: %d departments\n", groupedResults.NumRows())
 	fmt.Printf("Aggregation columns: %v\n", groupedResults.ColumnNames())
 
 	// 5. I/O Operations
 	fmt.Println("\n5. I/O Operations...")
-	
+
 	// Write to Parquet
 	parquetFile := "demo_output.parquet"
 	err := gf.WriteParquet(df, parquetFile)
@@ -75,7 +75,7 @@ func main() {
 		log.Printf("Parquet write error: %v", err)
 	} else {
 		fmt.Printf("✓ Written to %s\n", parquetFile)
-		
+
 		// Read back from Parquet
 		readDF, err := gf.ReadParquet(parquetFile)
 		if err != nil {
@@ -84,7 +84,7 @@ func main() {
 			defer readDF.Release()
 			fmt.Printf("✓ Read back %d rows from Parquet\n", readDF.NumRows())
 		}
-		
+
 		// Clean up
 		os.Remove(parquetFile)
 	}
@@ -96,7 +96,7 @@ func main() {
 		log.Printf("CSV write error: %v", err)
 	} else {
 		fmt.Printf("✓ Written to %s\n", csvFile)
-		
+
 		// Read back from CSV
 		readCSV, err := gf.ReadCSV(csvFile)
 		if err != nil {
@@ -105,7 +105,7 @@ func main() {
 			defer readCSV.Release()
 			fmt.Printf("✓ Read back %d rows from CSV\n", readCSV.NumRows())
 		}
-		
+
 		// Clean up
 		os.Remove(csvFile)
 	}
@@ -114,17 +114,17 @@ func main() {
 	fmt.Println("\n6. Performance Test...")
 	largeDF := createLargeDataFrame(50000)
 	defer largeDF.Release()
-	
+
 	fmt.Printf("Created large DataFrame: %d rows\n", largeDF.NumRows())
-	
+
 	// Complex chain of operations
 	complexResult := largeDF.
 		Filter(gf.Col("value").Gt(gf.Lit(500.0))).
-		WithColumn("category_upper", gf.Col("category")).  // String ops not implemented yet
+		WithColumn("category_upper", gf.Col("category")). // String ops not implemented yet
 		GroupBy("category").
 		Agg(gf.Mean("value").As("avg_value"))
 	defer complexResult.Release()
-	
+
 	fmt.Printf("Complex operation result: %d groups\n", complexResult.NumRows())
 
 	fmt.Println("\n🎉 GopherFrame demonstration completed successfully!")
@@ -211,7 +211,7 @@ func createLargeDataFrame(size int) *gf.DataFrame {
 	categoryBuilder := array.NewStringBuilder(pool)
 
 	categories := []string{"A", "B", "C", "D", "E"}
-	
+
 	for i := 0; i < size; i++ {
 		idBuilder.Append(int64(i))
 		valueBuilder.Append(float64(i%1000) + float64(i%100)*0.01)

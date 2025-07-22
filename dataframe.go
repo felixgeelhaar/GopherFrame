@@ -5,8 +5,8 @@ package gopherframe
 
 import (
 	"github.com/apache/arrow-go/v18/arrow"
-	"github.com/felixgeelhaar/gopherFrame/pkg/core"
-	"github.com/felixgeelhaar/gopherFrame/pkg/expr"
+	"github.com/felixgeelhaar/GopherFrame/pkg/core"
+	"github.com/felixgeelhaar/GopherFrame/pkg/expr"
 )
 
 // DataFrame is the public-facing DataFrame that provides a chainable,
@@ -76,20 +76,20 @@ func (df *DataFrame) Filter(predicate expr.Expr) *DataFrame {
 	if df.err != nil {
 		return &DataFrame{err: df.err}
 	}
-	
+
 	// Evaluate the predicate expression to get a boolean array
 	predicateArray, err := predicate.Evaluate(df.coreDF)
 	if err != nil {
 		return &DataFrame{err: err}
 	}
 	defer predicateArray.Release()
-	
+
 	// Use the core DataFrame's Filter method
 	filteredCoreDF, err := df.coreDF.Filter(predicateArray)
 	if err != nil {
 		return &DataFrame{err: err}
 	}
-	
+
 	return &DataFrame{coreDF: filteredCoreDF}
 }
 
@@ -98,13 +98,13 @@ func (df *DataFrame) Select(columnNames ...string) *DataFrame {
 	if df.err != nil {
 		return &DataFrame{err: df.err}
 	}
-	
+
 	// Use the core DataFrame's Select method
 	newCoreDF, err := df.coreDF.Select(columnNames)
 	if err != nil {
 		return &DataFrame{err: err}
 	}
-	
+
 	return &DataFrame{coreDF: newCoreDF}
 }
 
@@ -113,20 +113,20 @@ func (df *DataFrame) WithColumn(name string, expression expr.Expr) *DataFrame {
 	if df.err != nil {
 		return &DataFrame{err: df.err}
 	}
-	
+
 	// Evaluate the expression to get the new column
 	newColumnArray, err := expression.Evaluate(df.coreDF)
 	if err != nil {
 		return &DataFrame{err: err}
 	}
-	
+
 	// Use the core DataFrame's WithColumn method
 	newCoreDF, err := df.coreDF.WithColumn(name, newColumnArray)
 	if err != nil {
 		newColumnArray.Release()
 		return &DataFrame{err: err}
 	}
-	
+
 	newColumnArray.Release() // Core DataFrame took ownership
 	return &DataFrame{coreDF: newCoreDF}
 }
