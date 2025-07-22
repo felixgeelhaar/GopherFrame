@@ -1,0 +1,211 @@
+name: Manual Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to release (e.g., v0.1.1)'
+        required: true
+        type: string
+      draft:
+        description: 'Create as draft release'
+        required: false
+        default: false
+        type: boolean
+      prerelease:
+        description: 'Mark as pre-release'
+        required: false
+        default: false
+        type: boolean
+
+jobs:
+  validate:
+    name: Validate Release
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Validate version format
+      run: |
+        if [[ ! "${{ github.event.inputs.version }}" =~ ^v[0-9]+\.[0-9]+\.[0-9]+.*$ ]]; then
+          echo "❌ Invalid version format. Use semver format like v1.0.0"
+          exit 1
+        fi
+        echo "✅ Version format is valid: ${{ github.event.inputs.version }}"
+
+    - name: Check if tag exists
+      run: |
+        if git tag -l | grep -q "^${{ github.event.inputs.version }}$"; then
+          echo "❌ Tag ${{ github.event.inputs.version }} already exists"
+          exit 1
+        fi
+        echo "✅ Tag ${{ github.event.inputs.version }} is available"
+
+  test:
+    name: Pre-Release Testing
+    runs-on: ubuntu-latest
+    needs: validate
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Go
+      uses: actions/setup-go@v5
+      with:
+        go-version: '1.24'
+
+    - name: Cache Go modules
+      uses: actions/cache@v3
+      with:
+        path: ~/go/pkg/mod
+        key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+
+    - name: Download dependencies
+      run: go mod download
+
+    - name: Run comprehensive test suite
+      run: |
+        echo "🧪 Running unit tests..."
+        go test -v -race -coverprofile=coverage.out ./...
+        
+        echo "🎲 Running property-based tests..."
+        go test -v -run TestProperty -count=10
+        
+        echo "⚡ Running benchmarks..."
+        go test -bench=. -run=^$ -benchtime=5s
+        
+        echo "🔨 Verifying build..."
+        go build ./...
+
+    - name: Run integration tests
+      run: |
+        echo "🏃 Running complete demo..."
+        go run cmd/examples/complete_demo.go
+        
+        echo "📊 Running benchmark suite..."
+        go run cmd/benchmark/main.go
+
+    - name: Upload coverage
+      uses: codecov/codecov-action@v3
+      with:
+        file: ./coverage.out
+
+  create-release:
+    name: Create Release
+    runs-on: ubuntu-latest
+    needs: [validate, test]
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: Set up Go
+      uses: actions/setup-go@v5
+      with:
+        go-version: '1.24'
+
+    - name: Update version references
+      run: |
+        # Update any version references in code if they exist
+        echo "📝 Version: ${{ github.event.inputs.version }}"
+        
+        # Could update version in go.mod comment, README badges, etc.
+        # For now, just display the version being released
+
+    - name: Create and push tag
+      run: |
+        git config user.name "github-actions[bot]"
+        git config user.email "github-actions[bot]@users.noreply.github.com"
+        
+        git tag -a "${{ github.event.inputs.version }}" -m "Release ${{ github.event.inputs.version }}
+
+        Automated release created via GitHub Actions.
+        
+        Features and changes included in this release:
+        - See RELEASE_NOTES.md for detailed information
+        - All tests passing with comprehensive coverage
+        - Performance benchmarks verified
+        - Go module compatibility confirmed"
+        
+        git push origin "${{ github.event.inputs.version }}"
+
+    - name: Generate release notes
+      id: release_notes
+      run: |
+        if [ -f RELEASE_NOTES.md ]; then
+          echo "RELEASE_NOTES<<EOF" >> $GITHUB_OUTPUT
+          echo "# GopherFrame ${{ github.event.inputs.version }}" >> $GITHUB_OUTPUT
+          echo "" >> $GITHUB_OUTPUT
+          cat RELEASE_NOTES.md >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+        else
+          echo "RELEASE_NOTES<<EOF" >> $GITHUB_OUTPUT
+          echo "# GopherFrame ${{ github.event.inputs.version }}" >> $GITHUB_OUTPUT
+          echo "" >> $GITHUB_OUTPUT
+          echo "## Changes" >> $GITHUB_OUTPUT
+          echo "This release includes improvements and bug fixes." >> $GITHUB_OUTPUT
+          echo "" >> $GITHUB_OUTPUT
+          echo "## Installation" >> $GITHUB_OUTPUT
+          echo "\`\`\`bash" >> $GITHUB_OUTPUT
+          echo "go get github.com/felixgeelhaar/gopherFrame@${{ github.event.inputs.version }}" >> $GITHUB_OUTPUT
+          echo "\`\`\`" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+        fi
+
+    - name: Create GitHub Release
+      uses: softprops/action-gh-release@v2
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        tag_name: ${{ github.event.inputs.version }}
+        name: GopherFrame ${{ github.event.inputs.version }}
+        body: ${{ steps.release_notes.outputs.RELEASE_NOTES }}
+        draft: ${{ github.event.inputs.draft }}
+        prerelease: ${{ github.event.inputs.prerelease }}
+        generate_release_notes: true
+
+  verify-release:
+    name: Verify Release
+    runs-on: ubuntu-latest
+    needs: create-release
+    
+    steps:
+    - name: Wait for release to be available
+      run: sleep 30
+
+    - name: Test Go module download
+      run: |
+        cd $(mktemp -d)
+        go mod init test-release
+        
+        echo "🔍 Testing module download..."
+        go get github.com/felixgeelhaar/gopherFrame@${{ github.event.inputs.version }}
+        
+        echo "✅ Module downloaded successfully"
+        go list -m github.com/felixgeelhaar/gopherFrame
+
+    - name: Create test program
+      run: |
+        cd $(mktemp -d)
+        go mod init release-test
+        go get github.com/felixgeelhaar/gopherFrame@${{ github.event.inputs.version }}
+        
+        cat > main.go << 'EOF'
+        package main
+        
+        import (
+            "fmt"
+            gf "github.com/felixgeelhaar/gopherFrame"
+        )
+        
+        func main() {
+            fmt.Println("✅ GopherFrame ${{ github.event.inputs.version }} imported successfully!")
+        }
+        EOF
+        
+        go run main.go
