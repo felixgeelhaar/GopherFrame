@@ -1,0 +1,109 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  test:
+    name: Test Before Release
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Go
+      uses: actions/setup-go@v5
+      with:
+        go-version: '1.24'
+
+    - name: Cache Go modules
+      uses: actions/cache@v3
+      with:
+        path: ~/go/pkg/mod
+        key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+
+    - name: Download dependencies
+      run: go mod download
+
+    - name: Run all tests
+      run: go test -v -race ./...
+
+    - name: Run property tests
+      run: go test -v -run TestProperty -count=5
+
+    - name: Run benchmarks
+      run: go test -bench=. -run=^$ -benchtime=3s
+
+  release:
+    name: Create Release
+    runs-on: ubuntu-latest
+    needs: test
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: Set up Go
+      uses: actions/setup-go@v5
+      with:
+        go-version: '1.24'
+
+    - name: Cache Go modules
+      uses: actions/cache@v3
+      with:
+        path: ~/go/pkg/mod
+        key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+
+    - name: Download dependencies
+      run: go mod download
+
+    - name: Run comprehensive demo
+      run: go run cmd/examples/complete_demo.go
+
+    - name: Generate release notes
+      id: release_notes
+      run: |
+        if [ -f RELEASE_NOTES.md ]; then
+          echo "RELEASE_NOTES<<EOF" >> $GITHUB_OUTPUT
+          cat RELEASE_NOTES.md >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+        else
+          echo "RELEASE_NOTES=Release ${{ github.ref_name }}" >> $GITHUB_OUTPUT
+        fi
+
+    - name: Create Release
+      uses: actions/create-release@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        tag_name: ${{ github.ref }}
+        release_name: GopherFrame ${{ github.ref_name }}
+        body: ${{ steps.release_notes.outputs.RELEASE_NOTES }}
+        draft: false
+        prerelease: false
+
+  verify-module:
+    name: Verify Go Module
+    runs-on: ubuntu-latest
+    needs: test
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Go
+      uses: actions/setup-go@v5
+      with:
+        go-version: '1.24'
+
+    - name: Verify module can be downloaded
+      run: |
+        cd $(mktemp -d)
+        go mod init test
+        go get github.com/felixgeelhaar/gopherFrame@${{ github.ref_name }}
+        go list -m github.com/felixgeelhaar/gopherFrame

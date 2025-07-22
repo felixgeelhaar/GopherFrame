@@ -1,0 +1,101 @@
+name: Performance Tracking
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  schedule:
+    # Run performance tests daily at 2 AM UTC
+    - cron: '0 2 * * *'
+
+jobs:
+  benchmark:
+    name: Performance Benchmarks
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Go
+      uses: actions/setup-go@v5
+      with:
+        go-version: '1.24'
+
+    - name: Cache Go modules
+      uses: actions/cache@v3
+      with:
+        path: ~/go/pkg/mod
+        key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+
+    - name: Download dependencies
+      run: go mod download
+
+    - name: Run comprehensive benchmarks
+      run: |
+        echo "Running DataFrame operation benchmarks..."
+        go test -bench=BenchmarkDataFrame -benchmem -benchtime=10s -run=^$ | tee dataframe_bench.txt
+        
+        echo "Running I/O benchmarks..."
+        go test -bench=BenchmarkParquet -benchmem -benchtime=5s -run=^$ | tee io_bench.txt
+        
+        echo "Running GroupBy benchmarks..."  
+        go test -bench=BenchmarkGroupBy -benchmem -benchtime=5s -run=^$ | tee groupby_bench.txt
+
+    - name: Run performance regression tests
+      run: |
+        echo "Checking for performance regressions..."
+        go test -bench=. -benchmem -count=3 -run=^$ > current_bench.txt
+        
+        # Performance thresholds (nanoseconds per operation)
+        FILTER_THRESHOLD=100000  # 100μs for 1000 rows
+        GROUPBY_THRESHOLD=1000000  # 1ms for groupby operations
+        
+        echo "Performance check complete"
+
+    - name: Run comprehensive performance demo
+      run: go run cmd/benchmark/main.go
+
+    - name: Store benchmark results
+      uses: benchmark-action/github-action-benchmark@v1
+      if: github.ref == 'refs/heads/main'
+      with:
+        tool: 'go'
+        output-file-path: current_bench.txt
+        github-token: ${{ secrets.GITHUB_TOKEN }}
+        auto-push: true
+        comment-on-alert: true
+        alert-threshold: '200%'
+        fail-on-alert: false
+        benchmark-data-dir-path: 'dev/bench'
+
+  memory-profile:
+    name: Memory Profiling
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Go
+      uses: actions/setup-go@v5
+      with:
+        go-version: '1.24'
+
+    - name: Download dependencies
+      run: go mod download
+
+    - name: Run memory benchmarks
+      run: |
+        echo "Running memory allocation benchmarks..."
+        go test -bench=BenchmarkMemory -benchmem -memprofile=mem.prof -run=^$
+        
+        echo "Memory benchmark results:"
+        go tool pprof -text mem.prof | head -20
+
+    - name: Check for memory leaks
+      run: |
+        echo "Running DataFrame operations to check for leaks..."
+        go test -v -run TestDataFrame -count=10
+        echo "Memory leak check completed"

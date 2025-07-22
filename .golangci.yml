@@ -1,0 +1,96 @@
+run:
+  timeout: 5m
+  modules-download-mode: readonly
+
+linters-settings:
+  gocyclo:
+    min-complexity: 15
+  
+  govet:
+    check-shadowing: true
+  
+  golint:
+    min-confidence: 0.8
+  
+  gofmt:
+    simplify: true
+  
+  goimports:
+    local-prefixes: github.com/felixgeelhaar/gopherFrame
+
+  gocritic:
+    enabled-tags:
+      - performance
+      - style
+      - experimental
+    disabled-checks:
+      - wrapperFunc
+      - hugeParam
+
+  misspell:
+    locale: US
+
+linters:
+  enable:
+    - bodyclose
+    - deadcode
+    - depguard
+    - dogsled
+    - errcheck
+    - gochecknoinits
+    - goconst
+    - gocritic
+    - gocyclo
+    - gofmt
+    - goimports
+    - golint
+    - gosimple
+    - govet
+    - ineffassign
+    - interfacer
+    - maligned
+    - misspell
+    - nakedret
+    - staticcheck
+    - structcheck
+    - typecheck
+    - unconvert
+    - unparam
+    - unused
+    - varcheck
+    - whitespace
+
+  disable:
+    - dupl
+    - gochecknoglobals
+    - gocognit
+    - godox
+    - gosec
+    - lll
+    - prealloc
+
+issues:
+  exclude-rules:
+    # Disable certain linters for test files
+    - path: _test\.go
+      linters:
+        - gocyclo
+        - errcheck
+        - dupl
+        - gosec
+        - maligned
+    
+    # Disable line length check for comments with URLs
+    - linters:
+        - lll
+      source: "^//.*http"
+    
+    # Exclude known false positives
+    - text: "G104: Errors unhandled"
+      linters:
+        - gosec
+      path: _test\.go
+
+  exclude-use-default: false
+  max-issues-per-linter: 0
+  max-same-issues: 0
