@@ -14,6 +14,24 @@ import (
 	"github.com/felixgeelhaar/GopherFrame/pkg/storage"
 )
 
+// validateFilePath performs basic security validation on file paths
+// to prevent directory traversal attacks
+func validateFilePath(filename string) error {
+	if filename == "" {
+		return fmt.Errorf("filename cannot be empty")
+	}
+
+	// Clean the path to resolve any .. components
+	cleanPath := filepath.Clean(filename)
+
+	// Check for directory traversal attempts
+	if strings.Contains(cleanPath, "..") {
+		return fmt.Errorf("invalid file path: directory traversal detected")
+	}
+
+	return nil
+}
+
 // Backend implements storage.Backend for Apache Arrow IPC format.
 // This is the reference implementation and provides optimal performance
 // for Arrow-native operations.
@@ -31,6 +49,10 @@ func (b *Backend) Read(ctx context.Context, source string, opts storage.ReadOpti
 	// Validate source path
 	if source == "" {
 		return nil, storage.ErrInvalidSource
+	}
+
+	if err := validateFilePath(source); err != nil {
+		return nil, fmt.Errorf("%w: %v", storage.ErrInvalidSource, err)
 	}
 
 	// Open the file
@@ -65,9 +87,13 @@ func (b *Backend) Write(ctx context.Context, destination string, records storage
 		return storage.ErrInvalidSource
 	}
 
+	if err := validateFilePath(destination); err != nil {
+		return fmt.Errorf("%w: %v", storage.ErrInvalidSource, err)
+	}
+
 	// Create destination directory if needed
 	dir := filepath.Dir(destination)
-	if err := os.MkdirAll(dir, 0o755); err != nil {
+	if err := os.MkdirAll(dir, 0o750); err != nil {
 		return fmt.Errorf("failed to create destination directory: %w", err)
 	}
 

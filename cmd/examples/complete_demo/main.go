@@ -86,7 +86,9 @@ func main() {
 		}
 
 		// Clean up
-		os.Remove(parquetFile)
+		if err := os.Remove(parquetFile); err != nil {
+			log.Printf("Warning: failed to remove temporary file %s: %v", parquetFile, err)
+		}
 	}
 
 	// Write to CSV
@@ -107,7 +109,9 @@ func main() {
 		}
 
 		// Clean up
-		os.Remove(csvFile)
+		if err := os.Remove(csvFile); err != nil {
+			log.Printf("Warning: failed to remove temporary file %s: %v", csvFile, err)
+		}
 	}
 
 	// 6. Performance demonstration

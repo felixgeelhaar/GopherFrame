@@ -7,7 +7,9 @@ import (
 	"encoding/csv"
 	"fmt"
 	"os"
+	"path/filepath"
 	"strconv"
+	"strings"
 
 	"github.com/apache/arrow-go/v18/arrow"
 	"github.com/apache/arrow-go/v18/arrow/array"
@@ -18,9 +20,31 @@ import (
 	"github.com/apache/arrow-go/v18/parquet/pqarrow"
 )
 
+// validateFilePath performs basic security validation on file paths
+// to prevent directory traversal attacks
+func validateFilePath(filename string) error {
+	if filename == "" {
+		return fmt.Errorf("filename cannot be empty")
+	}
+
+	// Clean the path to resolve any .. components
+	cleanPath := filepath.Clean(filename)
+
+	// Check for directory traversal attempts
+	if strings.Contains(cleanPath, "..") {
+		return fmt.Errorf("invalid file path: directory traversal detected")
+	}
+
+	return nil
+}
+
 // ReadParquet reads a DataFrame from a Parquet file.
 // Returns a new DataFrame with the data from the file.
 func ReadParquet(filename string) (*DataFrame, error) {
+	if err := validateFilePath(filename); err != nil {
+		return nil, err
+	}
+
 	// Open the Parquet file
 	f, err := os.Open(filename)
 	if err != nil {
@@ -71,6 +95,10 @@ func WriteParquet(df *DataFrame, filename string) error {
 		return fmt.Errorf("DataFrame has error: %w", df.Err())
 	}
 
+	if err := validateFilePath(filename); err != nil {
+		return err
+	}
+
 	// Create the output file
 	f, err := os.Create(filename)
 	if err != nil {
@@ -116,6 +144,10 @@ func WriteParquet(df *DataFrame, filename string) error {
 // ReadCSV reads a DataFrame from a CSV file.
 // This implementation attempts to infer column types from the data.
 func ReadCSV(filename string) (*DataFrame, error) {
+	if err := validateFilePath(filename); err != nil {
+		return nil, err
+	}
+
 	// Read CSV data
 	header, records, err := readCSVData(filename)
 	if err != nil {
@@ -202,6 +234,10 @@ func WriteCSV(df *DataFrame, filename string) error {
 		return fmt.Errorf("DataFrame has error: %w", df.Err())
 	}
 
+	if err := validateFilePath(filename); err != nil {
+		return err
+	}
+
 	// Create the output file
 	f, err := os.Create(filename)
 	if err != nil {
@@ -276,6 +312,10 @@ func WriteCSV(df *DataFrame, filename string) error {
 
 // ReadArrowIPC reads a DataFrame from an Arrow IPC file.
 func ReadArrowIPC(filename string) (*DataFrame, error) {
+	if err := validateFilePath(filename); err != nil {
+		return nil, err
+	}
+
 	// Open the file
 	f, err := os.Open(filename)
 	if err != nil {
@@ -311,6 +351,10 @@ func ReadArrowIPC(filename string) (*DataFrame, error) {
 func WriteArrowIPC(df *DataFrame, filename string) error {
 	if df.Err() != nil {
 		return fmt.Errorf("DataFrame has error: %w", df.Err())
+	}
+
+	if err := validateFilePath(filename); err != nil {
+		return err
 	}
 
 	// Create the output file

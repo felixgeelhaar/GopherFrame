@@ -3,6 +3,7 @@ package core
 
 import (
 	"fmt"
+	"math"
 
 	"github.com/apache/arrow-go/v18/arrow"
 	"github.com/apache/arrow-go/v18/arrow/array"
@@ -138,6 +139,7 @@ func (s *Series) GetString(i int) (string, error) {
 
 // GetInt64 returns the value at index i as an int64.
 // This works for integer types and attempts conversion for others.
+// For uint64 values exceeding math.MaxInt64, returns an error to prevent silent overflow.
 func (s *Series) GetInt64(i int) (int64, error) {
 	if i < 0 || i >= s.Len() {
 		return 0, fmt.Errorf("index out of range: %d", i)
@@ -157,7 +159,11 @@ func (s *Series) GetInt64(i int) (int64, error) {
 	case *array.Int8:
 		return int64(arr.Value(i)), nil
 	case *array.Uint64:
-		return int64(arr.Value(i)), nil
+		val := arr.Value(i)
+		if val > math.MaxInt64 {
+			return 0, fmt.Errorf("uint64 value %d exceeds int64 range [0, %d]", val, int64(math.MaxInt64))
+		}
+		return int64(val), nil
 	case *array.Uint32:
 		return int64(arr.Value(i)), nil
 	case *array.Uint16:

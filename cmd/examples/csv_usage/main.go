@@ -47,7 +47,9 @@ func main() {
 	fmt.Printf("Filtered DataFrame has %d rows\n", result.NumRows())
 
 	// Clean up
-	os.Remove(csvFile)
+	if err := os.Remove(csvFile); err != nil {
+		fmt.Printf("Warning: failed to remove temporary file %s: %v\n", csvFile, err)
+	}
 	fmt.Println("\nCSV example completed successfully!")
 }
 
