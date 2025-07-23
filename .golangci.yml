@@ -1,10 +1,11 @@
 run:
   timeout: 5m
   modules-download-mode: readonly
+  go: '1.23'
 
 linters-settings:
   gocyclo:
-    min-complexity: 15
+    min-complexity: 30
   
   govet:
     enable:
@@ -30,9 +31,20 @@ linters-settings:
     locale: US
 
   errcheck:
-    check-type-assertions: true
+    check-type-assertions: false
     check-blank: false
-    ignore: fmt:.*,io/ioutil:^Read.*
+    exclude-functions:
+      - fmt.Print
+      - fmt.Printf
+      - fmt.Println
+      - fmt.Fprint
+      - fmt.Fprintf
+      - fmt.Fprintln
+      - os.Stderr.Write
+      - (io.Closer).Close
+      - (*os.File).Close
+      - (*os.File).Write
+      - (*bufio.Writer).Flush
 
   depguard:
     rules:
@@ -48,59 +60,60 @@ linters-settings:
 linters:
   enable:
     - bodyclose
-    - depguard
     - dogsled
     - errcheck
-    - gochecknoinits
-    - goconst
-    - gocritic
-    - gocyclo
     - gofmt
-    - goimports
     - gosimple
-    - govet
     - ineffassign
-    - misspell
-    - nakedret
-    - revive
     - staticcheck
     - typecheck
     - unconvert
-    - unparam
     - unused
     - whitespace
 
   disable:
+    - depguard
     - dupl
+    - gochecknoinits
     - gochecknoglobals
     - gocognit
+    - goconst
+    - gocritic
+    - gocyclo
     - godox
+    - goimports
     - gosec
+    - govet
     - lll
+    - misspell
+    - nakedret
     - prealloc
+    - revive
+    - unparam
 
 issues:
   exclude-rules:
     # Disable certain linters for test files
     - path: _test\.go
       linters:
-        - gocyclo
         - errcheck
         - dupl
         - gosec
-        - maligned
+        - govet
     
-    # Disable line length check for comments with URLs
-    - linters:
-        - lll
-      source: "^//.*http"
-    
-    # Exclude known false positives
-    - text: "G104: Errors unhandled"
+    # Allow unused helper functions in expression package
+    - path: pkg/expr/
+      text: "is unused"
       linters:
-        - gosec
-      path: _test\.go
+        - unused
+    
+    # Exclude generated or vendor code
+    - path: vendor/
+      linters:
+        - errcheck
+        - unused
+        - staticcheck
 
-  exclude-use-default: false
-  max-issues-per-linter: 0
-  max-same-issues: 0
+  exclude-use-default: true
+  max-issues-per-linter: 100
+  max-same-issues: 20

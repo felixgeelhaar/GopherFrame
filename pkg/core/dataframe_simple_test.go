@@ -151,7 +151,7 @@ func TestDataFrame_Equals(t *testing.T) {
 
 	// Test that different data gives different results (basic check)
 	if df1.NumRows() == df3.NumRows() {
-		// Both have same number of rows, which is expected
+		t.Log("Both DataFrames have same number of rows, which is expected")
 		// More detailed equality checking would require the Equals method
 	}
 }
