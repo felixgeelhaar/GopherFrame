@@ -45,7 +45,7 @@ func (b *Backend) Read(ctx context.Context, source string, opts storage.ReadOpti
 	// Create Arrow IPC file reader
 	reader, err := ipc.NewFileReader(file)
 	if err != nil {
-		file.Close()
+		_ = file.Close()
 		return nil, fmt.Errorf("failed to create Arrow file reader: %w", err)
 	}
 
@@ -67,7 +67,7 @@ func (b *Backend) Write(ctx context.Context, destination string, records storage
 
 	// Create destination directory if needed
 	dir := filepath.Dir(destination)
-	if err := os.MkdirAll(dir, 0755); err != nil {
+	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return fmt.Errorf("failed to create destination directory: %w", err)
 	}
 
@@ -83,14 +83,14 @@ func (b *Backend) Write(ctx context.Context, destination string, records storage
 	if err != nil {
 		return fmt.Errorf("failed to create Arrow file: %w", err)
 	}
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 
 	// Create Arrow IPC file writer
 	writer, err := ipc.NewFileWriter(file, ipc.WithSchema(records.Schema()))
 	if err != nil {
 		return fmt.Errorf("failed to create Arrow file writer: %w", err)
 	}
-	defer writer.Close()
+	defer func() { _ = writer.Close() }()
 
 	// Write all records
 	for records.Next() {
@@ -159,7 +159,7 @@ func (b *Backend) Scan(ctx context.Context, pattern string) ([]storage.SourceInf
 }
 
 // Schema implements storage.Backend.Schema for Arrow files.
-func (b *Backend) Schema(ctx context.Context, source string) (*arrow.Schema, error) {
+func (b *Backend) Schema(_ context.Context, source string) (*arrow.Schema, error) {
 	// Open the file
 	file, err := os.Open(source)
 	if err != nil {
@@ -168,14 +168,14 @@ func (b *Backend) Schema(ctx context.Context, source string) (*arrow.Schema, err
 		}
 		return nil, fmt.Errorf("failed to open Arrow file: %w", err)
 	}
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 
 	// Create Arrow IPC file reader
 	reader, err := ipc.NewFileReader(file)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create Arrow file reader: %w", err)
 	}
-	defer reader.Close()
+	defer func() { _ = reader.Close() }()
 
 	// Return the schema
 	return reader.Schema(), nil
@@ -252,7 +252,7 @@ func (r *recordReader) Err() error {
 // Close implements storage.RecordReader.Close.
 func (r *recordReader) Close() error {
 	if r.reader != nil {
-		r.reader.Close()
+		_ = r.reader.Close()
 	}
 	if r.file != nil {
 		return r.file.Close()

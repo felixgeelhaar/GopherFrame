@@ -5,121 +5,51 @@ import (
 	"testing"
 
 	"github.com/apache/arrow-go/v18/arrow"
-	"github.com/apache/arrow-go/v18/arrow/array"
-	"github.com/apache/arrow-go/v18/arrow/memory"
 )
 
-// Simple in-memory backend implementation for testing
-type MemoryBackend struct {
-	records []arrow.Record
-	schema  *arrow.Schema
-}
+func TestSourceInfo(t *testing.T) {
+	info := SourceInfo{
+		Name:     "test.parquet",
+		Path:     "/path/to/test.parquet",
+		Size:     1024,
+		Rows:     100,
+		Modified: 1640995200, // Unix timestamp
+		Metadata: map[string]string{
+			"format":      "parquet",
+			"compression": "snappy",
+		},
+	}
 
-func NewMemoryBackend() *MemoryBackend {
-	return &MemoryBackend{
-		records: make([]arrow.Record, 0),
+	if info.Name != "test.parquet" {
+		t.Errorf("Expected name 'test.parquet', got %s", info.Name)
+	}
+
+	if info.Path != "/path/to/test.parquet" {
+		t.Errorf("Expected path '/path/to/test.parquet', got %s", info.Path)
+	}
+
+	if info.Size != 1024 {
+		t.Errorf("Expected size 1024, got %d", info.Size)
+	}
+
+	if info.Rows != 100 {
+		t.Errorf("Expected rows 100, got %d", info.Rows)
+	}
+
+	if info.Modified != 1640995200 {
+		t.Errorf("Expected modified 1640995200, got %d", info.Modified)
+	}
+
+	if len(info.Metadata) != 2 {
+		t.Errorf("Expected 2 metadata entries, got %d", len(info.Metadata))
+	}
+
+	if info.Metadata["format"] != "parquet" {
+		t.Errorf("Expected format 'parquet', got %s", info.Metadata["format"])
 	}
 }
 
-func (m *MemoryBackend) AddRecord(record arrow.Record) error {
-	if m.schema == nil {
-		m.schema = record.Schema()
-	}
-	record.Retain()
-	m.records = append(m.records, record)
-	return nil
-}
-
-func (m *MemoryBackend) GetRecord(index int) (arrow.Record, error) {
-	if index < 0 || index >= len(m.records) {
-		return nil, ErrSourceNotFound
-	}
-	return m.records[index], nil
-}
-
-func (m *MemoryBackend) NumRecords() int {
-	return len(m.records)
-}
-
-func (m *MemoryBackend) Schema() *arrow.Schema {
-	return m.schema
-}
-
-func (m *MemoryBackend) Read(ctx context.Context, source string, opts ReadOptions) (RecordReader, error) {
-	return nil, ErrUnsupportedOperation
-}
-
-func (m *MemoryBackend) Write(ctx context.Context, destination string, records RecordReader, opts WriteOptions) error {
-	return ErrUnsupportedOperation
-}
-
-func (m *MemoryBackend) Scan(ctx context.Context, pattern string) ([]SourceInfo, error) {
-	return nil, ErrUnsupportedOperation
-}
-
-func (m *MemoryBackend) Close() error {
-	for _, record := range m.records {
-		record.Release()
-	}
-	m.records = nil
-	return nil
-}
-
-type SimpleRecordReader struct {
-	backend *MemoryBackend
-	index   int
-	err     error
-}
-
-func NewRecordReader(backend *MemoryBackend) *SimpleRecordReader {
-	return &SimpleRecordReader{
-		backend: backend,
-		index:   -1,
-	}
-}
-
-func (r *SimpleRecordReader) Next() bool {
-	r.index++
-	return r.index < r.backend.NumRecords()
-}
-
-func (r *SimpleRecordReader) Record() arrow.Record {
-	if r.index < 0 || r.index >= r.backend.NumRecords() {
-		return nil
-	}
-	record, err := r.backend.GetRecord(r.index)
-	if err != nil {
-		r.err = err
-		return nil
-	}
-	return record
-}
-
-func (r *SimpleRecordReader) Schema() *arrow.Schema {
-	return r.backend.Schema()
-}
-
-func (r *SimpleRecordReader) Err() error {
-	return r.err
-}
-
-func (r *SimpleRecordReader) Close() error {
-	return nil
-}
-
-func (r *SimpleRecordReader) Release() {
-	// Nothing to release for our simple implementation
-}
-
-func TestMemoryBackend(t *testing.T) {
-	backend := NewMemoryBackend()
-
-	// Test initial state
-	if backend.NumRecords() != 0 {
-		t.Errorf("Expected 0 records, got %d", backend.NumRecords())
-	}
-
-	// Create test record
+func TestReadOptions(t *testing.T) {
 	schema := arrow.NewSchema(
 		[]arrow.Field{
 			{Name: "id", Type: arrow.PrimitiveTypes.Int64},
@@ -128,255 +58,227 @@ func TestMemoryBackend(t *testing.T) {
 		nil,
 	)
 
-	pool := memory.NewGoAllocator()
-	idBuilder := array.NewInt64Builder(pool)
-	nameBuilder := array.NewStringBuilder(pool)
-
-	idBuilder.AppendValues([]int64{1, 2, 3}, nil)
-	nameBuilder.AppendValues([]string{"Alice", "Bob", "Charlie"}, nil)
-
-	idArray := idBuilder.NewArray()
-	nameArray := nameBuilder.NewArray()
-	defer idArray.Release()
-	defer nameArray.Release()
-
-	record := array.NewRecord(schema, []arrow.Array{idArray, nameArray}, 3)
-
-	// Test AddRecord
-	err := backend.AddRecord(record)
-	if err != nil {
-		t.Fatalf("AddRecord failed: %v", err)
-	}
-
-	if backend.NumRecords() != 1 {
-		t.Errorf("Expected 1 record, got %d", backend.NumRecords())
-	}
-
-	// Test GetRecord
-	retrievedRecord, err := backend.GetRecord(0)
-	if err != nil {
-		t.Fatalf("GetRecord failed: %v", err)
-	}
-
-	if retrievedRecord.NumRows() != 3 {
-		t.Errorf("Expected 3 rows, got %d", retrievedRecord.NumRows())
-	}
-
-	if retrievedRecord.NumCols() != 2 {
-		t.Errorf("Expected 2 columns, got %d", retrievedRecord.NumCols())
-	}
-
-	// Test GetRecord with invalid index
-	_, err = backend.GetRecord(1)
-	if err == nil {
-		t.Error("Expected error for invalid index")
-	}
-
-	// Test GetRecord with negative index
-	_, err = backend.GetRecord(-1)
-	if err == nil {
-		t.Error("Expected error for negative index")
-	}
-}
-
-func TestMemoryBackend_MultipleRecords(t *testing.T) {
-	backend := NewMemoryBackend()
-
-	schema := arrow.NewSchema(
-		[]arrow.Field{{Name: "value", Type: arrow.PrimitiveTypes.Float64}},
-		nil,
-	)
-
-	pool := memory.NewGoAllocator()
-
-	// Add multiple records
-	for i := 0; i < 5; i++ {
-		builder := array.NewFloat64Builder(pool)
-		builder.AppendValues([]float64{float64(i), float64(i + 1)}, nil)
-		arr := builder.NewArray()
-		defer arr.Release()
-
-		record := array.NewRecord(schema, []arrow.Array{arr}, 2)
-		err := backend.AddRecord(record)
-		if err != nil {
-			t.Fatalf("AddRecord %d failed: %v", i, err)
-		}
-	}
-
-	if backend.NumRecords() != 5 {
-		t.Errorf("Expected 5 records, got %d", backend.NumRecords())
-	}
-
-	// Test retrieving all records
-	for i := 0; i < 5; i++ {
-		record, err := backend.GetRecord(i)
-		if err != nil {
-			t.Fatalf("GetRecord %d failed: %v", i, err)
-		}
-
-		if record.NumRows() != 2 {
-			t.Errorf("Record %d: expected 2 rows, got %d", i, record.NumRows())
-		}
-	}
-}
-
-func TestMemoryBackend_Schema(t *testing.T) {
-	backend := NewMemoryBackend()
-
-	// Test empty backend schema
-	schema := backend.Schema()
-	if schema != nil {
-		t.Error("Expected nil schema for empty backend")
-	}
-
-	// Add record and test schema
-	testSchema := arrow.NewSchema(
-		[]arrow.Field{
-			{Name: "test", Type: arrow.PrimitiveTypes.Int32},
+	opts := ReadOptions{
+		Columns:   []string{"id", "name"},
+		Filter:    "id > 100",
+		Limit:     500,
+		BatchSize: 1000,
+		Schema:    schema,
+		Options: map[string]interface{}{
+			"parallel": true,
 		},
-		nil,
-	)
+	}
 
-	pool := memory.NewGoAllocator()
-	builder := array.NewInt32Builder(pool)
-	builder.Append(42)
-	arr := builder.NewArray()
-	defer arr.Release()
+	if len(opts.Columns) != 2 {
+		t.Errorf("Expected 2 columns, got %d", len(opts.Columns))
+	}
 
-	record := array.NewRecord(testSchema, []arrow.Array{arr}, 1)
-	err := backend.AddRecord(record)
+	if opts.Columns[0] != "id" || opts.Columns[1] != "name" {
+		t.Errorf("Expected columns [id, name], got %v", opts.Columns)
+	}
+
+	if opts.Filter != "id > 100" {
+		t.Errorf("Expected filter 'id > 100', got %s", opts.Filter)
+	}
+
+	if opts.Limit != 500 {
+		t.Errorf("Expected limit 500, got %d", opts.Limit)
+	}
+
+	if opts.BatchSize != 1000 {
+		t.Errorf("Expected batch size 1000, got %d", opts.BatchSize)
+	}
+
+	if opts.Schema == nil {
+		t.Error("Expected schema to be set")
+	}
+
+	if len(opts.Options) != 1 {
+		t.Errorf("Expected 1 option, got %d", len(opts.Options))
+	}
+
+	if parallel, ok := opts.Options["parallel"].(bool); !ok || !parallel {
+		t.Error("Expected parallel option to be true")
+	}
+}
+
+func TestWriteOptions(t *testing.T) {
+	opts := WriteOptions{
+		Overwrite:        true,
+		PartitionColumns: []string{"year", "month"},
+		Compression:      "snappy",
+		BatchSize:        2000,
+		Options: map[string]interface{}{
+			"row_group_size": 50000,
+		},
+	}
+
+	if !opts.Overwrite {
+		t.Error("Expected overwrite to be true")
+	}
+
+	if len(opts.PartitionColumns) != 2 {
+		t.Errorf("Expected 2 partition columns, got %d", len(opts.PartitionColumns))
+	}
+
+	if opts.PartitionColumns[0] != "year" || opts.PartitionColumns[1] != "month" {
+		t.Errorf("Expected partition columns [year, month], got %v", opts.PartitionColumns)
+	}
+
+	if opts.Compression != "snappy" {
+		t.Errorf("Expected compression 'snappy', got %s", opts.Compression)
+	}
+
+	if opts.BatchSize != 2000 {
+		t.Errorf("Expected batch size 2000, got %d", opts.BatchSize)
+	}
+
+	if len(opts.Options) != 1 {
+		t.Errorf("Expected 1 option, got %d", len(opts.Options))
+	}
+
+	if rowGroupSize, ok := opts.Options["row_group_size"].(int); !ok || rowGroupSize != 50000 {
+		t.Error("Expected row_group_size option to be 50000")
+	}
+}
+
+func TestStreamReader(_ *testing.T) {
+	// Test that StreamReader struct can be instantiated
+	// Since it's currently just a placeholder, we just test basic construction
+	var reader StreamReader
+
+	// StreamReader should be a valid struct (even if empty)
+	_ = reader
+}
+
+func TestNewRegistry(t *testing.T) {
+	registry := NewRegistry()
+
+	if registry == nil {
+		t.Fatal("NewRegistry should not return nil")
+	}
+
+	if registry.backends == nil {
+		t.Error("Registry backends map should be initialized")
+	}
+
+	if len(registry.backends) != 0 {
+		t.Error("New registry should start with no backends")
+	}
+}
+
+func TestRegistry_Register(t *testing.T) {
+	registry := NewRegistry()
+
+	// Mock backend factory
+	mockFactory := func() Backend {
+		return &mockBackend{}
+	}
+
+	// Register backend
+	registry.Register("mock", mockFactory)
+
+	if len(registry.backends) != 1 {
+		t.Errorf("Expected 1 backend after registration, got %d", len(registry.backends))
+	}
+
+	if _, exists := registry.backends["mock"]; !exists {
+		t.Error("Backend should be registered with name 'mock'")
+	}
+}
+
+func TestRegistry_Create(t *testing.T) {
+	registry := NewRegistry()
+
+	// Mock backend factory
+	mockFactory := func() Backend {
+		return &mockBackend{}
+	}
+
+	// Register backend
+	registry.Register("mock", mockFactory)
+
+	// Create backend
+	backend, err := registry.Create("mock")
 	if err != nil {
-		t.Fatalf("AddRecord failed: %v", err)
+		t.Fatalf("Failed to create backend: %v", err)
 	}
 
-	schema = backend.Schema()
-	if schema == nil {
-		t.Fatal("Expected non-nil schema after adding record")
+	if backend == nil {
+		t.Error("Created backend should not be nil")
 	}
 
-	if !schema.Equal(testSchema) {
-		t.Error("Schema doesn't match expected schema")
+	if _, ok := backend.(*mockBackend); !ok {
+		t.Error("Created backend should be of type mockBackend")
+	}
+
+	// Test creating non-existent backend
+	_, err = registry.Create("nonexistent")
+	if err == nil {
+		t.Error("Creating non-existent backend should return error")
 	}
 }
 
-func TestNewRecordReader(t *testing.T) {
-	// Create backend with test data
-	backend := NewMemoryBackend()
-	schema := arrow.NewSchema(
-		[]arrow.Field{{Name: "id", Type: arrow.PrimitiveTypes.Int64}},
-		nil,
-	)
+func TestRegistry_List(t *testing.T) {
+	registry := NewRegistry()
 
-	pool := memory.NewGoAllocator()
-	builder := array.NewInt64Builder(pool)
-	builder.AppendValues([]int64{1, 2, 3}, nil)
-	arr := builder.NewArray()
-	defer arr.Release()
-
-	record := array.NewRecord(schema, []arrow.Array{arr}, 3)
-	err := backend.AddRecord(record)
-	if err != nil {
-		t.Fatalf("AddRecord failed: %v", err)
+	// Initially should be empty
+	backends := registry.List()
+	if len(backends) != 0 {
+		t.Errorf("Expected 0 backends initially, got %d", len(backends))
 	}
 
-	// Test creating reader
-	reader := NewRecordReader(backend)
-	if reader == nil {
-		t.Fatal("NewRecordReader returned nil")
+	// Register some backends
+	registry.Register("arrow", func() Backend { return &mockBackend{} })
+	registry.Register("parquet", func() Backend { return &mockBackend{} })
+	registry.Register("csv", func() Backend { return &mockBackend{} })
+
+	backends = registry.List()
+	if len(backends) != 3 {
+		t.Errorf("Expected 3 backends after registration, got %d", len(backends))
 	}
 
-	// Test Schema method
-	readerSchema := reader.Schema()
-	if !readerSchema.Equal(schema) {
-		t.Error("Reader schema doesn't match backend schema")
+	// Check that all expected backends are listed
+	expectedBackends := map[string]bool{
+		"arrow":   false,
+		"parquet": false,
+		"csv":     false,
 	}
 
-	// Test Next method
-	hasNext := reader.Next()
-	if !hasNext {
-		t.Error("Expected reader to have next record")
-	}
-
-	readRecord := reader.Record()
-	if readRecord.NumRows() != 3 {
-		t.Errorf("Expected 3 rows, got %d", readRecord.NumRows())
-	}
-
-	// Test no more records
-	hasNext = reader.Next()
-	if hasNext {
-		t.Error("Expected no more records")
-	}
-
-	// Test Err method
-	if reader.Err() != nil {
-		t.Errorf("Unexpected error: %v", reader.Err())
-	}
-
-	// Test Release
-	reader.Release()
-}
-
-func TestRecordReader_Empty(t *testing.T) {
-	backend := NewMemoryBackend()
-	reader := NewRecordReader(backend)
-
-	// Test empty reader
-	hasNext := reader.Next()
-	if hasNext {
-		t.Error("Expected no records in empty reader")
-	}
-
-	record := reader.Record()
-	if record != nil {
-		t.Error("Expected nil record from empty reader")
-	}
-
-	if reader.Schema() != nil {
-		t.Error("Expected nil schema from empty reader")
-	}
-
-	reader.Release()
-}
-
-func TestRecordReader_MultipleRecords(t *testing.T) {
-	backend := NewMemoryBackend()
-	schema := arrow.NewSchema(
-		[]arrow.Field{{Name: "value", Type: arrow.PrimitiveTypes.Float64}},
-		nil,
-	)
-
-	pool := memory.NewGoAllocator()
-
-	// Add 3 records
-	for i := 0; i < 3; i++ {
-		builder := array.NewFloat64Builder(pool)
-		builder.Append(float64(i))
-		arr := builder.NewArray()
-		defer arr.Release()
-
-		record := array.NewRecord(schema, []arrow.Array{arr}, 1)
-		backend.AddRecord(record)
-	}
-
-	reader := NewRecordReader(backend)
-	defer reader.Release()
-
-	// Read all records
-	recordCount := 0
-	for reader.Next() {
-		record := reader.Record()
-		if record.NumRows() != 1 {
-			t.Errorf("Record %d: expected 1 row, got %d", recordCount, record.NumRows())
+	for _, name := range backends {
+		if _, exists := expectedBackends[name]; exists {
+			expectedBackends[name] = true
+		} else {
+			t.Errorf("Unexpected backend in list: %s", name)
 		}
-		recordCount++
 	}
 
-	if recordCount != 3 {
-		t.Errorf("Expected 3 records, read %d", recordCount)
+	for name, found := range expectedBackends {
+		if !found {
+			t.Errorf("Expected backend %s not found in list", name)
+		}
 	}
+}
 
-	if reader.Err() != nil {
-		t.Errorf("Unexpected error: %v", reader.Err())
-	}
+// mockBackend is a simple mock implementation for testing
+type mockBackend struct{}
+
+func (m *mockBackend) Read(_ context.Context, _ string, _ ReadOptions) (RecordReader, error) {
+	return nil, nil
+}
+
+func (m *mockBackend) Write(_ context.Context, _ string, _ RecordReader, _ WriteOptions) error {
+	return nil
+}
+
+func (m *mockBackend) Scan(_ context.Context, _ string) ([]SourceInfo, error) {
+	return nil, nil
+}
+
+func (m *mockBackend) Schema(_ context.Context, _ string) (*arrow.Schema, error) {
+	return nil, nil
+}
+
+func (m *mockBackend) Close() error {
+	return nil
 }

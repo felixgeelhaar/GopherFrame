@@ -196,7 +196,9 @@ func (gdf *GroupedDataFrame) Agg(specs ...AggregationSpec) *DataFrame {
 // AggregationType represents the type of aggregation operation.
 type AggregationType int
 
+// Aggregation type constants
 const (
+	// SumAgg represents sum aggregation
 	SumAgg AggregationType = iota
 	MeanAgg
 	CountAgg

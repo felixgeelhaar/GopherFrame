@@ -53,7 +53,7 @@ func NewDataFrameFromStorage(ctx context.Context, backend storage.Backend, sourc
 	if err != nil {
 		return nil, fmt.Errorf("failed to read from storage: %w", err)
 	}
-	defer reader.Close()
+	defer func() { _ = reader.Close() }()
 
 	// For now, read the first record. Future versions will handle multiple records.
 	if !reader.Next() {
@@ -441,7 +441,10 @@ func (df *DataFrame) Filter(predicateArray arrow.Array) (*DataFrame, error) {
 
 		switch field.Type.ID() {
 		case arrow.INT64:
-			srcArray := column.(*array.Int64)
+			srcArray, ok := column.(*array.Int64)
+			if !ok {
+				return nil, fmt.Errorf("expected Int64 array for column %d", colIdx)
+			}
 			builder := array.NewInt64Builder(pool)
 
 			for i := 0; i < boolArray.Len(); i++ {
@@ -457,7 +460,10 @@ func (df *DataFrame) Filter(predicateArray arrow.Array) (*DataFrame, error) {
 			builder.Release()
 
 		case arrow.FLOAT64:
-			srcArray := column.(*array.Float64)
+			srcArray, ok := column.(*array.Float64)
+			if !ok {
+				return nil, fmt.Errorf("expected Float64 array for column %d", colIdx)
+			}
 			builder := array.NewFloat64Builder(pool)
 
 			for i := 0; i < boolArray.Len(); i++ {
@@ -473,7 +479,10 @@ func (df *DataFrame) Filter(predicateArray arrow.Array) (*DataFrame, error) {
 			builder.Release()
 
 		case arrow.STRING:
-			srcArray := column.(*array.String)
+			srcArray, ok := column.(*array.String)
+			if !ok {
+				return nil, fmt.Errorf("expected String array for column %d", colIdx)
+			}
 			builder := array.NewStringBuilder(pool)
 
 			for i := 0; i < boolArray.Len(); i++ {
@@ -496,6 +505,273 @@ func (df *DataFrame) Filter(predicateArray arrow.Array) (*DataFrame, error) {
 	// Create new record with filtered data
 	filteredRecord := array.NewRecord(schema, filteredColumns, trueCount)
 	return NewDataFrame(filteredRecord), nil
+}
+
+// SortKey represents a sorting specification for multi-column sorts
+type SortKey struct {
+	Column    string
+	Ascending bool
+}
+
+// Sort returns a new DataFrame sorted by the specified column.
+func (df *DataFrame) Sort(columnName string, ascending bool) (*DataFrame, error) {
+	return df.SortMultiple([]SortKey{{Column: columnName, Ascending: ascending}})
+}
+
+// SortMultiple returns a new DataFrame sorted by multiple columns in the specified order.
+func (df *DataFrame) SortMultiple(sortKeys []SortKey) (*DataFrame, error) {
+	if len(sortKeys) == 0 {
+		return nil, fmt.Errorf("no sort keys provided")
+	}
+
+	// Validate all columns exist
+	schema := df.record.Schema()
+	for _, key := range sortKeys {
+		found := false
+		for _, field := range schema.Fields() {
+			if field.Name == key.Column {
+				found = true
+				break
+			}
+		}
+		if !found {
+			return nil, fmt.Errorf("column not found: %s", key.Column)
+		}
+	}
+
+	// Get the number of rows
+	numRows := int(df.NumRows())
+	if numRows == 0 {
+		return df.Clone(), nil
+	}
+
+	// Create row indices
+	indices := make([]int, numRows)
+	for i := 0; i < numRows; i++ {
+		indices[i] = i
+	}
+
+	// Sort indices based on the column values
+	err := df.sortIndices(indices, sortKeys)
+	if err != nil {
+		return nil, fmt.Errorf("failed to sort indices: %w", err)
+	}
+
+	// Create new arrays with sorted data
+	newColumns := make([]arrow.Array, df.NumCols())
+	pool := memory.NewGoAllocator()
+
+	for colIdx, field := range schema.Fields() {
+		column := df.record.Column(colIdx)
+
+		switch field.Type.ID() {
+		case arrow.INT64:
+			srcArray, ok := column.(*array.Int64)
+			if !ok {
+				return nil, fmt.Errorf("expected Int64 array for column %d", colIdx)
+			}
+			builder := array.NewInt64Builder(pool)
+			defer builder.Release()
+
+			for _, idx := range indices {
+				if srcArray.IsNull(idx) {
+					builder.AppendNull()
+				} else {
+					builder.Append(srcArray.Value(idx))
+				}
+			}
+			newColumns[colIdx] = builder.NewArray()
+
+		case arrow.FLOAT64:
+			srcArray, ok := column.(*array.Float64)
+			if !ok {
+				return nil, fmt.Errorf("expected Float64 array for column %d", colIdx)
+			}
+			builder := array.NewFloat64Builder(pool)
+			defer builder.Release()
+
+			for _, idx := range indices {
+				if srcArray.IsNull(idx) {
+					builder.AppendNull()
+				} else {
+					builder.Append(srcArray.Value(idx))
+				}
+			}
+			newColumns[colIdx] = builder.NewArray()
+
+		case arrow.STRING:
+			srcArray, ok := column.(*array.String)
+			if !ok {
+				return nil, fmt.Errorf("expected String array for column %d", colIdx)
+			}
+			builder := array.NewStringBuilder(pool)
+			defer builder.Release()
+
+			for _, idx := range indices {
+				if srcArray.IsNull(idx) {
+					builder.AppendNull()
+				} else {
+					builder.Append(srcArray.Value(idx))
+				}
+			}
+			newColumns[colIdx] = builder.NewArray()
+
+		case arrow.BOOL:
+			srcArray, ok := column.(*array.Boolean)
+			if !ok {
+				return nil, fmt.Errorf("expected Boolean array for column %d", colIdx)
+			}
+			builder := array.NewBooleanBuilder(pool)
+			defer builder.Release()
+
+			for _, idx := range indices {
+				if srcArray.IsNull(idx) {
+					builder.AppendNull()
+				} else {
+					builder.Append(srcArray.Value(idx))
+				}
+			}
+			newColumns[colIdx] = builder.NewArray()
+
+		default:
+			return nil, fmt.Errorf("unsupported data type for sorting: %s", field.Type)
+		}
+	}
+
+	// Create new record with sorted data
+	sortedRecord := array.NewRecord(schema, newColumns, df.record.NumRows())
+	return NewDataFrame(sortedRecord), nil
+}
+
+// sortIndices sorts the indices array based on the specified sort keys using a stable sort
+func (df *DataFrame) sortIndices(indices []int, sortKeys []SortKey) error {
+	schema := df.record.Schema()
+
+	// Get column indices for sort keys
+	sortColumnIndices := make([]int, len(sortKeys))
+	for i, key := range sortKeys {
+		found := false
+		for j, field := range schema.Fields() {
+			if field.Name == key.Column {
+				sortColumnIndices[i] = j
+				found = true
+				break
+			}
+		}
+		if !found {
+			return fmt.Errorf("column not found: %s", key.Column)
+		}
+	}
+
+	// Custom comparison function for sorting
+	less := func(i, j int) bool {
+		idxI, idxJ := indices[i], indices[j]
+
+		for k, key := range sortKeys {
+			colIdx := sortColumnIndices[k]
+			column := df.record.Column(colIdx)
+			field := schema.Field(colIdx)
+
+			cmp := df.compareValues(column, field.Type, idxI, idxJ)
+			if cmp != 0 {
+				if key.Ascending {
+					return cmp < 0
+				} else {
+					return cmp > 0
+				}
+			}
+		}
+		return false // Equal values
+	}
+
+	// Use a stable sort to maintain relative order for equal values
+	df.stableSort(indices, less)
+	return nil
+}
+
+// compareValues compares two values at given indices in a column
+// Returns -1 if left < right, 0 if equal, 1 if left > right
+func (df *DataFrame) compareValues(column arrow.Array, dataType arrow.DataType, leftIdx, rightIdx int) int {
+	// Handle null values (nulls sort last)
+	leftNull := column.IsNull(leftIdx)
+	rightNull := column.IsNull(rightIdx)
+
+	if leftNull && rightNull {
+		return 0
+	}
+	if leftNull {
+		return 1 // null sorts after non-null
+	}
+	if rightNull {
+		return -1 // non-null sorts before null
+	}
+
+	switch dataType.ID() {
+	case arrow.INT64:
+		arr, ok := column.(*array.Int64)
+		if !ok {
+			return 0
+		}
+		left, right := arr.Value(leftIdx), arr.Value(rightIdx)
+		if left < right {
+			return -1
+		} else if left > right {
+			return 1
+		}
+		return 0
+
+	case arrow.FLOAT64:
+		arr, ok := column.(*array.Float64)
+		if !ok {
+			return 0
+		}
+		left, right := arr.Value(leftIdx), arr.Value(rightIdx)
+		if left < right {
+			return -1
+		} else if left > right {
+			return 1
+		}
+		return 0
+
+	case arrow.STRING:
+		arr, ok := column.(*array.String)
+		if !ok {
+			return 0
+		}
+		left, right := arr.Value(leftIdx), arr.Value(rightIdx)
+		if left < right {
+			return -1
+		} else if left > right {
+			return 1
+		}
+		return 0
+
+	case arrow.BOOL:
+		arr, ok := column.(*array.Boolean)
+		if !ok {
+			return 0
+		}
+		left, right := arr.Value(leftIdx), arr.Value(rightIdx)
+		// false < true
+		if !left && right {
+			return -1
+		} else if left && !right {
+			return 1
+		}
+		return 0
+
+	default:
+		return 0 // Unsupported types are considered equal
+	}
+}
+
+// stableSort implements a stable sort algorithm (insertion sort for simplicity)
+func (df *DataFrame) stableSort(indices []int, less func(i, j int) bool) {
+	for i := 1; i < len(indices); i++ {
+		for j := i; j > 0 && less(j, j-1); j-- {
+			indices[j], indices[j-1] = indices[j-1], indices[j]
+		}
+	}
 }
 
 // Release decrements the reference count of the underlying Arrow Record.

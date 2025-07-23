@@ -4,7 +4,6 @@ package persistence
 
 import (
 	"context"
-	"io"
 
 	"github.com/apache/arrow-go/v18/arrow"
 )
@@ -60,7 +59,7 @@ type SourceInfo struct {
 
 // StreamReader adapts an io.Reader to RecordReader interface.
 type StreamReader struct {
-	reader io.ReadCloser
+	// Implementation would contain Arrow IPC stream reader
 }
 
 // Registry manages available persistence backends.

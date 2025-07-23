@@ -233,7 +233,10 @@ func (gdf *GroupedDataFrame) performMean(series *core.Series, groupIndices map[s
 	builder := array.NewFloat64Builder(pool)
 	defer builder.Release()
 
-	sumFloat := sumArray.(*array.Float64)
+	sumFloat, ok := sumArray.(*array.Float64)
+	if !ok {
+		return arrow.Field{}, nil, fmt.Errorf("unexpected array type for sum result")
+	}
 
 	// Sort keys to maintain consistent order
 	var keys []string
@@ -314,7 +317,7 @@ func (gdf *GroupedDataFrame) performMin(series *core.Series, groupIndices map[st
 
 	for _, key := range keys {
 		indices := groupIndices[key]
-		var min *float64
+		var minVal *float64
 
 		for _, idx := range indices {
 			if !series.IsNull(idx) {
@@ -323,14 +326,14 @@ func (gdf *GroupedDataFrame) performMin(series *core.Series, groupIndices map[st
 					return arrow.Field{}, nil, fmt.Errorf("failed to get float64 value: %w", err)
 				}
 
-				if min == nil || val < *min {
-					min = &val
+				if minVal == nil || val < *minVal {
+					minVal = &val
 				}
 			}
 		}
 
-		if min != nil {
-			builder.Append(*min)
+		if minVal != nil {
+			builder.Append(*minVal)
 		} else {
 			builder.AppendNull()
 		}
@@ -358,7 +361,7 @@ func (gdf *GroupedDataFrame) performMax(series *core.Series, groupIndices map[st
 
 	for _, key := range keys {
 		indices := groupIndices[key]
-		var max *float64
+		var maxVal *float64
 
 		for _, idx := range indices {
 			if !series.IsNull(idx) {
@@ -367,14 +370,14 @@ func (gdf *GroupedDataFrame) performMax(series *core.Series, groupIndices map[st
 					return arrow.Field{}, nil, fmt.Errorf("failed to get float64 value: %w", err)
 				}
 
-				if max == nil || val > *max {
-					max = &val
+				if maxVal == nil || val > *maxVal {
+					maxVal = &val
 				}
 			}
 		}
 
-		if max != nil {
-			builder.Append(*max)
+		if maxVal != nil {
+			builder.Append(*maxVal)
 		} else {
 			builder.AppendNull()
 		}

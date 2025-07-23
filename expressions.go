@@ -20,7 +20,7 @@ func Lit(value interface{}) expr.Expr {
 // Expression builder methods
 // These will be added to the core expression types to enable fluent chaining
 
-// Extend ColumnExpr with fluent methods
+// ColumnExpr extends the basic expression interface with fluent methods
 type ColumnExpr interface {
 	expr.Expr
 	// Add creates an addition expression

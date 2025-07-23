@@ -31,7 +31,7 @@ func NewSeries(arr arrow.Array, field arrow.Field) *Series {
 
 // NewSeriesFromData creates a Series from raw data using Arrow builders.
 // T must be a supported Arrow data type.
-func NewSeriesFromData[T any](name string, data []T) (*Series, error) {
+func NewSeriesFromData[T any](_ string, _ []T) (*Series, error) {
 	// This is a simplified version. Production implementation would
 	// handle all Arrow data types and use proper builders.
 	return nil, fmt.Errorf("NewSeriesFromData not yet implemented")

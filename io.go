@@ -26,7 +26,7 @@ func ReadParquet(filename string) (*DataFrame, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to open Parquet file: %w", err)
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 
 	// Skip file info - not needed for reading
 
@@ -35,7 +35,7 @@ func ReadParquet(filename string) (*DataFrame, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to create Parquet reader: %w", err)
 	}
-	defer parquetReader.Close()
+	defer func() { _ = parquetReader.Close() }()
 
 	// Create Arrow file reader from Parquet
 	arrowReader, err := pqarrow.NewFileReader(parquetReader, pqarrow.ArrowReadProperties{}, memory.DefaultAllocator)
@@ -76,16 +76,16 @@ func WriteParquet(df *DataFrame, filename string) error {
 	if err != nil {
 		return fmt.Errorf("failed to create output file: %w", err)
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 
 	// Get the Arrow record from the DataFrame
 	record := df.coreDF.Record()
-	
+
 	// Create Arrow table from record
 	table := array.NewTableFromRecords(record.Schema(), []arrow.Record{record})
 	defer table.Release()
 
-	// Set up Parquet writer properties  
+	// Set up Parquet writer properties
 	writerProps := parquet.NewWriterProperties()
 	arrowProps := pqarrow.DefaultWriterProps()
 
@@ -94,10 +94,15 @@ func WriteParquet(df *DataFrame, filename string) error {
 	if err != nil {
 		return fmt.Errorf("failed to create Parquet writer: %w", err)
 	}
-	defer writer.Close()
+	defer func() {
+		if err := writer.Close(); err != nil {
+			// Log error but don't override the main error
+			fmt.Fprintf(os.Stderr, "warning: failed to close Parquet writer: %v\n", err)
+		}
+	}()
 
 	// Write the table with proper chunk size
-	chunkSize := int64(table.NumRows())
+	chunkSize := table.NumRows()
 	if chunkSize <= 0 {
 		chunkSize = 1000 // Default chunk size
 	}
@@ -111,30 +116,10 @@ func WriteParquet(df *DataFrame, filename string) error {
 // ReadCSV reads a DataFrame from a CSV file.
 // This implementation attempts to infer column types from the data.
 func ReadCSV(filename string) (*DataFrame, error) {
-	// Open the CSV file
-	f, err := os.Open(filename)
+	// Read CSV data
+	header, records, err := readCSVData(filename)
 	if err != nil {
-		return nil, fmt.Errorf("failed to open CSV file: %w", err)
-	}
-	defer f.Close()
-
-	// Create CSV reader
-	reader := csv.NewReader(f)
-	
-	// Read header row
-	header, err := reader.Read()
-	if err != nil {
-		return nil, fmt.Errorf("failed to read CSV header: %w", err)
-	}
-
-	// Read all records to determine types and build columns
-	records, err := reader.ReadAll()
-	if err != nil {
-		return nil, fmt.Errorf("failed to read CSV records: %w", err)
-	}
-
-	if len(records) == 0 {
-		return nil, fmt.Errorf("CSV file has no data rows")
+		return nil, err
 	}
 
 	// Infer column types by checking first non-empty value in each column
@@ -150,60 +135,13 @@ func ReadCSV(filename string) (*DataFrame, error) {
 
 	for colIdx, colName := range header {
 		fields[colIdx] = arrow.Field{Name: colName, Type: columnTypes[colIdx]}
-
-		switch columnTypes[colIdx].ID() {
-		case arrow.INT64:
-			builder := array.NewInt64Builder(pool)
-			for _, row := range records {
-				if colIdx < len(row) && row[colIdx] != "" {
-					val, err := strconv.ParseInt(row[colIdx], 10, 64)
-					if err != nil {
-						builder.AppendNull()
-					} else {
-						builder.Append(val)
-					}
-				} else {
-					builder.AppendNull()
-				}
-			}
-			arrays[colIdx] = builder.NewArray()
-			builder.Release()
-
-		case arrow.FLOAT64:
-			builder := array.NewFloat64Builder(pool)
-			for _, row := range records {
-				if colIdx < len(row) && row[colIdx] != "" {
-					val, err := strconv.ParseFloat(row[colIdx], 64)
-					if err != nil {
-						builder.AppendNull()
-					} else {
-						builder.Append(val)
-					}
-				} else {
-					builder.AppendNull()
-				}
-			}
-			arrays[colIdx] = builder.NewArray()
-			builder.Release()
-
-		default: // STRING
-			builder := array.NewStringBuilder(pool)
-			for _, row := range records {
-				if colIdx < len(row) {
-					builder.Append(row[colIdx])
-				} else {
-					builder.Append("")
-				}
-			}
-			arrays[colIdx] = builder.NewArray()
-			builder.Release()
-		}
+		arrays[colIdx] = buildColumnArray(pool, columnTypes[colIdx], records, colIdx)
 	}
 
 	// Create schema and record
 	schema := arrow.NewSchema(fields, nil)
 	record := array.NewRecord(schema, arrays, int64(len(records)))
-	
+
 	// Release arrays as they're now owned by the record
 	for _, arr := range arrays {
 		arr.Release()
@@ -269,7 +207,7 @@ func WriteCSV(df *DataFrame, filename string) error {
 	if err != nil {
 		return fmt.Errorf("failed to create CSV file: %w", err)
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 
 	// Create CSV writer
 	writer := csv.NewWriter(f)
@@ -288,7 +226,7 @@ func WriteCSV(df *DataFrame, filename string) error {
 	// Write data rows
 	for i := 0; i < numRows; i++ {
 		row := make([]string, numCols)
-		
+
 		// Convert each column value to string
 		for j := 0; j < numCols; j++ {
 			series, err := df.coreDF.Column(header[j])
@@ -343,14 +281,18 @@ func ReadArrowIPC(filename string) (*DataFrame, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to open Arrow IPC file: %w", err)
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 
 	// Create Arrow IPC file reader
 	reader, err := ipc.NewFileReader(f)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create Arrow IPC reader: %w", err)
 	}
-	defer reader.Close()
+	defer func() {
+		if err := reader.Close(); err != nil {
+			fmt.Fprintf(os.Stderr, "warning: failed to close Arrow reader: %v\n", err)
+		}
+	}()
 
 	// Read the first record
 	if reader.NumRecords() == 0 {
@@ -376,7 +318,7 @@ func WriteArrowIPC(df *DataFrame, filename string) error {
 	if err != nil {
 		return fmt.Errorf("failed to create output file: %w", err)
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 
 	// Get the Arrow record from the DataFrame
 	record := df.coreDF.Record()
@@ -386,7 +328,11 @@ func WriteArrowIPC(df *DataFrame, filename string) error {
 	if err != nil {
 		return fmt.Errorf("failed to create Arrow IPC writer: %w", err)
 	}
-	defer writer.Close()
+	defer func() {
+		if err := writer.Close(); err != nil {
+			fmt.Fprintf(os.Stderr, "warning: failed to close Arrow writer: %v\n", err)
+		}
+	}()
 
 	// Write the record
 	if err := writer.Write(record); err != nil {
@@ -394,4 +340,105 @@ func WriteArrowIPC(df *DataFrame, filename string) error {
 	}
 
 	return nil
+}
+
+// readCSVData reads and parses CSV file data
+func readCSVData(filename string) ([]string, [][]string, error) {
+	// Open the CSV file
+	f, err := os.Open(filename)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to open CSV file: %w", err)
+	}
+	defer func() { _ = f.Close() }()
+
+	// Create CSV reader
+	reader := csv.NewReader(f)
+
+	// Read header row
+	header, err := reader.Read()
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to read CSV header: %w", err)
+	}
+
+	// Read all records to determine types and build columns
+	records, err := reader.ReadAll()
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to read CSV records: %w", err)
+	}
+
+	if len(records) == 0 {
+		return nil, nil, fmt.Errorf("CSV file has no data rows")
+	}
+
+	return header, records, nil
+}
+
+// buildColumnArray creates an Arrow array for a specific column
+func buildColumnArray(pool memory.Allocator, dataType arrow.DataType, records [][]string, colIdx int) arrow.Array {
+	switch dataType.ID() {
+	case arrow.INT64:
+		return buildInt64Array(pool, records, colIdx)
+	case arrow.FLOAT64:
+		return buildFloat64Array(pool, records, colIdx)
+	default: // STRING
+		return buildStringArray(pool, records, colIdx)
+	}
+}
+
+// buildInt64Array creates an int64 Arrow array
+func buildInt64Array(pool memory.Allocator, records [][]string, colIdx int) arrow.Array {
+	builder := array.NewInt64Builder(pool)
+	defer builder.Release()
+
+	for _, row := range records {
+		if colIdx < len(row) && row[colIdx] != "" {
+			val, err := strconv.ParseInt(row[colIdx], 10, 64)
+			if err != nil {
+				builder.AppendNull()
+			} else {
+				builder.Append(val)
+			}
+		} else {
+			builder.AppendNull()
+		}
+	}
+
+	return builder.NewArray()
+}
+
+// buildFloat64Array creates a float64 Arrow array
+func buildFloat64Array(pool memory.Allocator, records [][]string, colIdx int) arrow.Array {
+	builder := array.NewFloat64Builder(pool)
+	defer builder.Release()
+
+	for _, row := range records {
+		if colIdx < len(row) && row[colIdx] != "" {
+			val, err := strconv.ParseFloat(row[colIdx], 64)
+			if err != nil {
+				builder.AppendNull()
+			} else {
+				builder.Append(val)
+			}
+		} else {
+			builder.AppendNull()
+		}
+	}
+
+	return builder.NewArray()
+}
+
+// buildStringArray creates a string Arrow array
+func buildStringArray(pool memory.Allocator, records [][]string, colIdx int) arrow.Array {
+	builder := array.NewStringBuilder(pool)
+	defer builder.Release()
+
+	for _, row := range records {
+		if colIdx < len(row) {
+			builder.Append(row[colIdx])
+		} else {
+			builder.Append("")
+		}
+	}
+
+	return builder.NewArray()
 }

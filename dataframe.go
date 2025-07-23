@@ -131,11 +131,77 @@ func (df *DataFrame) WithColumn(name string, expression expr.Expr) *DataFrame {
 	return &DataFrame{coreDF: newCoreDF}
 }
 
+// Col creates a column expression for use in operations like Filter and WithColumn.
+// Example: df.Col("age") returns an expression representing the "age" column
+func (df *DataFrame) Col(name string) expr.Expr {
+	return expr.Col(name)
+}
+
+// Record returns the underlying Arrow Record.
+func (df *DataFrame) Record() arrow.Record {
+	if df.err != nil || df.coreDF == nil {
+		return nil
+	}
+	return df.coreDF.Record()
+}
+
 // Release releases the underlying Arrow resources.
 // The DataFrame should not be used after calling Release.
 func (df *DataFrame) Release() {
 	if df.coreDF != nil {
 		df.coreDF.Release()
 		df.coreDF = nil
+	}
+}
+
+// SortKey represents a sorting specification for multi-column sorts
+type SortKey struct {
+	Column    string
+	Ascending bool
+}
+
+// Sort returns a new DataFrame sorted by the specified column.
+func (df *DataFrame) Sort(columnName string, ascending bool) *DataFrame {
+	if df.err != nil {
+		return &DataFrame{err: df.err}
+	}
+
+	sortedCoreDF, err := df.coreDF.Sort(columnName, ascending)
+	if err != nil {
+		return &DataFrame{err: err}
+	}
+
+	return &DataFrame{coreDF: sortedCoreDF}
+}
+
+// SortMultiple returns a new DataFrame sorted by multiple columns in the specified order.
+func (df *DataFrame) SortMultiple(sortKeys []SortKey) *DataFrame {
+	if df.err != nil {
+		return &DataFrame{err: df.err}
+	}
+
+	// Convert public SortKey to core.SortKey
+	coreSortKeys := make([]core.SortKey, len(sortKeys))
+	for i, key := range sortKeys {
+		coreSortKeys[i] = core.SortKey{
+			Column:    key.Column,
+			Ascending: key.Ascending,
+		}
+	}
+
+	sortedCoreDF, err := df.coreDF.SortMultiple(coreSortKeys)
+	if err != nil {
+		return &DataFrame{err: err}
+	}
+
+	return &DataFrame{coreDF: sortedCoreDF}
+}
+
+// By creates a sort specification for a column.
+// Example: By("age", true) for ascending, By("name", false) for descending
+func By(column string, ascending bool) SortKey {
+	return SortKey{
+		Column:    column,
+		Ascending: ascending,
 	}
 }

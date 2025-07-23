@@ -19,7 +19,7 @@ const (
 // BenchmarkDataFrameCreation measures DataFrame creation performance
 func BenchmarkDataFrameCreation(b *testing.B) {
 	sizes := []int{smallSize, mediumSize, largeSize}
-	
+
 	for _, size := range sizes {
 		b.Run(fmt.Sprintf("Size_%d", size), func(b *testing.B) {
 			schema := arrow.NewSchema(
@@ -30,7 +30,7 @@ func BenchmarkDataFrameCreation(b *testing.B) {
 				},
 				nil,
 			)
-			
+
 			b.ResetTimer()
 			for i := 0; i < b.N; i++ {
 				record := createBenchmarkRecord(schema, size)
@@ -44,11 +44,11 @@ func BenchmarkDataFrameCreation(b *testing.B) {
 // BenchmarkFilter measures filter operation performance
 func BenchmarkFilter(b *testing.B) {
 	sizes := []int{smallSize, mediumSize, largeSize}
-	
+
 	for _, size := range sizes {
 		df := createBenchmarkDataFrame(size)
 		defer df.Release()
-		
+
 		b.Run(fmt.Sprintf("Size_%d", size), func(b *testing.B) {
 			b.ResetTimer()
 			for i := 0; i < b.N; i++ {
@@ -62,11 +62,11 @@ func BenchmarkFilter(b *testing.B) {
 // BenchmarkSelect measures column selection performance
 func BenchmarkSelect(b *testing.B) {
 	sizes := []int{smallSize, mediumSize, largeSize}
-	
+
 	for _, size := range sizes {
 		df := createBenchmarkDataFrame(size)
 		defer df.Release()
-		
+
 		b.Run(fmt.Sprintf("Size_%d", size), func(b *testing.B) {
 			b.ResetTimer()
 			for i := 0; i < b.N; i++ {
@@ -80,11 +80,11 @@ func BenchmarkSelect(b *testing.B) {
 // BenchmarkWithColumn measures column computation performance
 func BenchmarkWithColumn(b *testing.B) {
 	sizes := []int{smallSize, mediumSize, largeSize}
-	
+
 	for _, size := range sizes {
 		df := createBenchmarkDataFrame(size)
 		defer df.Release()
-		
+
 		b.Run(fmt.Sprintf("Size_%d", size), func(b *testing.B) {
 			b.ResetTimer()
 			for i := 0; i < b.N; i++ {
@@ -98,11 +98,11 @@ func BenchmarkWithColumn(b *testing.B) {
 // BenchmarkGroupBySum measures GroupBy with sum aggregation performance
 func BenchmarkGroupBySum(b *testing.B) {
 	sizes := []int{smallSize, mediumSize, largeSize}
-	
+
 	for _, size := range sizes {
 		df := createBenchmarkDataFrame(size)
 		defer df.Release()
-		
+
 		b.Run(fmt.Sprintf("Size_%d", size), func(b *testing.B) {
 			b.ResetTimer()
 			for i := 0; i < b.N; i++ {
@@ -116,11 +116,11 @@ func BenchmarkGroupBySum(b *testing.B) {
 // BenchmarkGroupByMultipleAgg measures GroupBy with multiple aggregations
 func BenchmarkGroupByMultipleAgg(b *testing.B) {
 	sizes := []int{smallSize, mediumSize}
-	
+
 	for _, size := range sizes {
 		df := createBenchmarkDataFrame(size)
 		defer df.Release()
-		
+
 		b.Run(fmt.Sprintf("Size_%d", size), func(b *testing.B) {
 			b.ResetTimer()
 			for i := 0; i < b.N; i++ {
@@ -140,11 +140,11 @@ func BenchmarkGroupByMultipleAgg(b *testing.B) {
 // BenchmarkChainedOperations measures performance of chained operations
 func BenchmarkChainedOperations(b *testing.B) {
 	sizes := []int{smallSize, mediumSize}
-	
+
 	for _, size := range sizes {
 		df := createBenchmarkDataFrame(size)
 		defer df.Release()
-		
+
 		b.Run(fmt.Sprintf("Size_%d", size), func(b *testing.B) {
 			b.ResetTimer()
 			for i := 0; i < b.N; i++ {
@@ -161,11 +161,11 @@ func BenchmarkChainedOperations(b *testing.B) {
 // BenchmarkParquetWrite measures Parquet write performance
 func BenchmarkParquetWrite(b *testing.B) {
 	sizes := []int{smallSize, mediumSize}
-	
+
 	for _, size := range sizes {
 		df := createBenchmarkDataFrame(size)
 		defer df.Release()
-		
+
 		b.Run(fmt.Sprintf("Size_%d", size), func(b *testing.B) {
 			tempFile := b.TempDir() + "/bench.parquet"
 			b.ResetTimer()
@@ -182,7 +182,7 @@ func BenchmarkParquetWrite(b *testing.B) {
 // BenchmarkParquetRead measures Parquet read performance
 func BenchmarkParquetRead(b *testing.B) {
 	sizes := []int{smallSize, mediumSize}
-	
+
 	for _, size := range sizes {
 		// Create test file
 		df := createBenchmarkDataFrame(size)
@@ -191,7 +191,7 @@ func BenchmarkParquetRead(b *testing.B) {
 			b.Fatalf("Failed to create test file: %v", err)
 		}
 		df.Release()
-		
+
 		b.Run(fmt.Sprintf("Size_%d", size), func(b *testing.B) {
 			b.ResetTimer()
 			for i := 0; i < b.N; i++ {
@@ -208,11 +208,11 @@ func BenchmarkParquetRead(b *testing.B) {
 // BenchmarkCSVWrite measures CSV write performance
 func BenchmarkCSVWrite(b *testing.B) {
 	sizes := []int{smallSize, mediumSize}
-	
+
 	for _, size := range sizes {
 		df := createBenchmarkDataFrame(size)
 		defer df.Release()
-		
+
 		b.Run(fmt.Sprintf("Size_%d", size), func(b *testing.B) {
 			tempFile := b.TempDir() + "/bench.csv"
 			b.ResetTimer()
@@ -231,7 +231,7 @@ func BenchmarkMemoryUsage(b *testing.B) {
 	b.Run("Filter_Memory", func(b *testing.B) {
 		df := createBenchmarkDataFrame(mediumSize)
 		defer df.Release()
-		
+
 		b.ResetTimer()
 		b.ReportAllocs()
 		for i := 0; i < b.N; i++ {
@@ -239,11 +239,11 @@ func BenchmarkMemoryUsage(b *testing.B) {
 			filtered.Release()
 		}
 	})
-	
+
 	b.Run("GroupBy_Memory", func(b *testing.B) {
 		df := createBenchmarkDataFrame(mediumSize)
 		defer df.Release()
-		
+
 		b.ResetTimer()
 		b.ReportAllocs()
 		for i := 0; i < b.N; i++ {
@@ -263,7 +263,7 @@ func createBenchmarkDataFrame(size int) *DataFrame {
 		},
 		nil,
 	)
-	
+
 	record := createBenchmarkRecord(schema, size)
 	return NewDataFrame(record)
 }
@@ -271,7 +271,7 @@ func createBenchmarkDataFrame(size int) *DataFrame {
 // Helper function to create benchmark record
 func createBenchmarkRecord(schema *arrow.Schema, size int) arrow.Record {
 	pool := memory.NewGoAllocator()
-	
+
 	// Create ID column
 	idBuilder := array.NewInt64Builder(pool)
 	for i := 0; i < size; i++ {
@@ -279,7 +279,7 @@ func createBenchmarkRecord(schema *arrow.Schema, size int) arrow.Record {
 	}
 	idArray := idBuilder.NewArray()
 	defer idArray.Release()
-	
+
 	// Create value column with distribution
 	valueBuilder := array.NewFloat64Builder(pool)
 	for i := 0; i < size; i++ {
@@ -289,7 +289,7 @@ func createBenchmarkRecord(schema *arrow.Schema, size int) arrow.Record {
 	}
 	valueArray := valueBuilder.NewArray()
 	defer valueArray.Release()
-	
+
 	// Create category column with reasonable cardinality
 	categoryBuilder := array.NewStringBuilder(pool)
 	categories := []string{"A", "B", "C", "D", "E", "F", "G", "H", "I", "J"}
@@ -298,6 +298,6 @@ func createBenchmarkRecord(schema *arrow.Schema, size int) arrow.Record {
 	}
 	categoryArray := categoryBuilder.NewArray()
 	defer categoryArray.Release()
-	
+
 	return array.NewRecord(schema, []arrow.Array{idArray, valueArray, categoryArray}, int64(size))
 }

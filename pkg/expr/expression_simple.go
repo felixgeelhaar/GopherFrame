@@ -71,31 +71,37 @@ func (c *ColumnExpr) String() string {
 	return fmt.Sprintf("Col(%s)", c.columnName)
 }
 
-// Fluent methods for ColumnExpr to enable chaining
+// Add creates a binary expression that adds this column to another expression.
 func (c *ColumnExpr) Add(other Expr) Expr {
 	return NewBinaryExpr(c, other, "add")
 }
 
+// Sub creates a binary expression that subtracts another expression from this column.
 func (c *ColumnExpr) Sub(other Expr) Expr {
 	return NewBinaryExpr(c, other, "subtract")
 }
 
+// Mul creates a binary expression that multiplies this column by another expression.
 func (c *ColumnExpr) Mul(other Expr) Expr {
 	return NewBinaryExpr(c, other, "multiply")
 }
 
+// Div creates a binary expression that divides this column by another expression.
 func (c *ColumnExpr) Div(other Expr) Expr {
 	return NewBinaryExpr(c, other, "divide")
 }
 
+// Gt creates a binary expression that tests if this column is greater than another expression.
 func (c *ColumnExpr) Gt(other Expr) Expr {
 	return NewBinaryExpr(c, other, "greater")
 }
 
+// Lt creates a binary expression that tests if this column is less than another expression.
 func (c *ColumnExpr) Lt(other Expr) Expr {
 	return NewBinaryExpr(c, other, "less")
 }
 
+// Eq creates a binary expression that tests if this column is equal to another expression.
 func (c *ColumnExpr) Eq(other Expr) Expr {
 	return NewBinaryExpr(c, other, "equal")
 }
@@ -205,19 +211,22 @@ func (l *LiteralExpr) String() string {
 	return l.name
 }
 
-// Fluent methods for LiteralExpr
+// Add creates a binary expression that adds this literal to another expression.
 func (l *LiteralExpr) Add(other Expr) Expr {
 	return NewBinaryExpr(l, other, "add")
 }
 
+// Sub creates a binary expression that subtracts another expression from this literal.
 func (l *LiteralExpr) Sub(other Expr) Expr {
 	return NewBinaryExpr(l, other, "subtract")
 }
 
+// Mul creates a binary expression that multiplies this literal by another expression.
 func (l *LiteralExpr) Mul(other Expr) Expr {
 	return NewBinaryExpr(l, other, "multiply")
 }
 
+// Div creates a binary expression that divides this literal by another expression.
 func (l *LiteralExpr) Div(other Expr) Expr {
 	return NewBinaryExpr(l, other, "divide")
 }
@@ -298,8 +307,14 @@ func (b *BinaryExpr) evaluateGreater(left, right arrow.Array) (arrow.Array, erro
 
 	// Handle Float64 comparisons (most common case for our test)
 	if left.DataType().ID() == arrow.FLOAT64 && right.DataType().ID() == arrow.FLOAT64 {
-		leftFloat := left.(*array.Float64)
-		rightFloat := right.(*array.Float64)
+		leftFloat, ok := asFloat64Array(left)
+		if !ok {
+			return nil, fmt.Errorf("failed to cast left array to Float64")
+		}
+		rightFloat, ok := asFloat64Array(right)
+		if !ok {
+			return nil, fmt.Errorf("failed to cast right array to Float64")
+		}
 
 		for i := 0; i < left.Len(); i++ {
 			if leftFloat.IsNull(i) || rightFloat.IsNull(i) {
@@ -333,19 +348,203 @@ func (b *BinaryExpr) evaluateGreater(left, right arrow.Array) (arrow.Array, erro
 
 // Add placeholder implementations for other operations
 func (b *BinaryExpr) evaluateLess(left, right arrow.Array) (arrow.Array, error) {
-	return nil, fmt.Errorf("less-than operation not yet implemented")
+	if left.Len() != right.Len() {
+		return nil, fmt.Errorf("array length mismatch: %d vs %d", left.Len(), right.Len())
+	}
+
+	pool := memory.NewGoAllocator()
+	builder := array.NewBooleanBuilder(pool)
+	defer builder.Release()
+
+	// Handle Float64 comparisons
+	if left.DataType().ID() == arrow.FLOAT64 && right.DataType().ID() == arrow.FLOAT64 {
+		leftFloat := left.(*array.Float64)
+		rightFloat := right.(*array.Float64)
+
+		for i := 0; i < left.Len(); i++ {
+			if leftFloat.IsNull(i) || rightFloat.IsNull(i) {
+				builder.AppendNull()
+			} else {
+				builder.Append(leftFloat.Value(i) < rightFloat.Value(i))
+			}
+		}
+
+		return builder.NewArray(), nil
+	}
+
+	// Handle Int64 comparisons
+	if left.DataType().ID() == arrow.INT64 && right.DataType().ID() == arrow.INT64 {
+		leftInt := left.(*array.Int64)
+		rightInt := right.(*array.Int64)
+
+		for i := 0; i < left.Len(); i++ {
+			if leftInt.IsNull(i) || rightInt.IsNull(i) {
+				builder.AppendNull()
+			} else {
+				builder.Append(leftInt.Value(i) < rightInt.Value(i))
+			}
+		}
+
+		return builder.NewArray(), nil
+	}
+
+	return nil, fmt.Errorf("unsupported types for less-than comparison: %s < %s", left.DataType(), right.DataType())
 }
 
 func (b *BinaryExpr) evaluateEqual(left, right arrow.Array) (arrow.Array, error) {
-	return nil, fmt.Errorf("equal operation not yet implemented")
+	if left.Len() != right.Len() {
+		return nil, fmt.Errorf("array length mismatch: %d vs %d", left.Len(), right.Len())
+	}
+
+	pool := memory.NewGoAllocator()
+	builder := array.NewBooleanBuilder(pool)
+	defer builder.Release()
+
+	// Handle String comparisons
+	if left.DataType().ID() == arrow.STRING && right.DataType().ID() == arrow.STRING {
+		leftStr := left.(*array.String)
+		rightStr := right.(*array.String)
+
+		for i := 0; i < left.Len(); i++ {
+			if leftStr.IsNull(i) || rightStr.IsNull(i) {
+				builder.AppendNull()
+			} else {
+				builder.Append(leftStr.Value(i) == rightStr.Value(i))
+			}
+		}
+
+		return builder.NewArray(), nil
+	}
+
+	// Handle Int64 comparisons
+	if left.DataType().ID() == arrow.INT64 && right.DataType().ID() == arrow.INT64 {
+		leftInt := left.(*array.Int64)
+		rightInt := right.(*array.Int64)
+
+		for i := 0; i < left.Len(); i++ {
+			if leftInt.IsNull(i) || rightInt.IsNull(i) {
+				builder.AppendNull()
+			} else {
+				builder.Append(leftInt.Value(i) == rightInt.Value(i))
+			}
+		}
+
+		return builder.NewArray(), nil
+	}
+
+	// Handle Float64 comparisons
+	if left.DataType().ID() == arrow.FLOAT64 && right.DataType().ID() == arrow.FLOAT64 {
+		leftFloat := left.(*array.Float64)
+		rightFloat := right.(*array.Float64)
+
+		for i := 0; i < left.Len(); i++ {
+			if leftFloat.IsNull(i) || rightFloat.IsNull(i) {
+				builder.AppendNull()
+			} else {
+				builder.Append(leftFloat.Value(i) == rightFloat.Value(i))
+			}
+		}
+
+		return builder.NewArray(), nil
+	}
+
+	return nil, fmt.Errorf("unsupported types for equality comparison: %s == %s", left.DataType(), right.DataType())
 }
 
 func (b *BinaryExpr) evaluateAdd(left, right arrow.Array) (arrow.Array, error) {
-	return nil, fmt.Errorf("add operation not yet implemented")
+	if left.Len() != right.Len() {
+		return nil, fmt.Errorf("array length mismatch: %d vs %d", left.Len(), right.Len())
+	}
+
+	pool := memory.NewGoAllocator()
+
+	// Handle Float64 addition
+	if left.DataType().ID() == arrow.FLOAT64 && right.DataType().ID() == arrow.FLOAT64 {
+		builder := array.NewFloat64Builder(pool)
+		defer builder.Release()
+
+		leftFloat := left.(*array.Float64)
+		rightFloat := right.(*array.Float64)
+
+		for i := 0; i < left.Len(); i++ {
+			if leftFloat.IsNull(i) || rightFloat.IsNull(i) {
+				builder.AppendNull()
+			} else {
+				builder.Append(leftFloat.Value(i) + rightFloat.Value(i))
+			}
+		}
+
+		return builder.NewArray(), nil
+	}
+
+	// Handle Int64 addition
+	if left.DataType().ID() == arrow.INT64 && right.DataType().ID() == arrow.INT64 {
+		builder := array.NewInt64Builder(pool)
+		defer builder.Release()
+
+		leftInt := left.(*array.Int64)
+		rightInt := right.(*array.Int64)
+
+		for i := 0; i < left.Len(); i++ {
+			if leftInt.IsNull(i) || rightInt.IsNull(i) {
+				builder.AppendNull()
+			} else {
+				builder.Append(leftInt.Value(i) + rightInt.Value(i))
+			}
+		}
+
+		return builder.NewArray(), nil
+	}
+
+	return nil, fmt.Errorf("unsupported types for addition: %s + %s", left.DataType(), right.DataType())
 }
 
 func (b *BinaryExpr) evaluateSubtract(left, right arrow.Array) (arrow.Array, error) {
-	return nil, fmt.Errorf("subtract operation not yet implemented")
+	if left.Len() != right.Len() {
+		return nil, fmt.Errorf("array length mismatch: %d vs %d", left.Len(), right.Len())
+	}
+
+	pool := memory.NewGoAllocator()
+
+	// Handle Float64 subtraction
+	if left.DataType().ID() == arrow.FLOAT64 && right.DataType().ID() == arrow.FLOAT64 {
+		builder := array.NewFloat64Builder(pool)
+		defer builder.Release()
+
+		leftFloat := left.(*array.Float64)
+		rightFloat := right.(*array.Float64)
+
+		for i := 0; i < left.Len(); i++ {
+			if leftFloat.IsNull(i) || rightFloat.IsNull(i) {
+				builder.AppendNull()
+			} else {
+				builder.Append(leftFloat.Value(i) - rightFloat.Value(i))
+			}
+		}
+
+		return builder.NewArray(), nil
+	}
+
+	// Handle Int64 subtraction
+	if left.DataType().ID() == arrow.INT64 && right.DataType().ID() == arrow.INT64 {
+		builder := array.NewInt64Builder(pool)
+		defer builder.Release()
+
+		leftInt := left.(*array.Int64)
+		rightInt := right.(*array.Int64)
+
+		for i := 0; i < left.Len(); i++ {
+			if leftInt.IsNull(i) || rightInt.IsNull(i) {
+				builder.AppendNull()
+			} else {
+				builder.Append(leftInt.Value(i) - rightInt.Value(i))
+			}
+		}
+
+		return builder.NewArray(), nil
+	}
+
+	return nil, fmt.Errorf("unsupported types for subtraction: %s - %s", left.DataType(), right.DataType())
 }
 
 func (b *BinaryExpr) evaluateMultiply(left, right arrow.Array) (arrow.Array, error) {
@@ -378,7 +577,59 @@ func (b *BinaryExpr) evaluateMultiply(left, right arrow.Array) (arrow.Array, err
 }
 
 func (b *BinaryExpr) evaluateDivide(left, right arrow.Array) (arrow.Array, error) {
-	return nil, fmt.Errorf("divide operation not yet implemented")
+	if left.Len() != right.Len() {
+		return nil, fmt.Errorf("array length mismatch: %d vs %d", left.Len(), right.Len())
+	}
+
+	pool := memory.NewGoAllocator()
+
+	// Handle Float64 division
+	if left.DataType().ID() == arrow.FLOAT64 && right.DataType().ID() == arrow.FLOAT64 {
+		builder := array.NewFloat64Builder(pool)
+		defer builder.Release()
+
+		leftFloat := left.(*array.Float64)
+		rightFloat := right.(*array.Float64)
+
+		for i := 0; i < left.Len(); i++ {
+			if leftFloat.IsNull(i) || rightFloat.IsNull(i) {
+				builder.AppendNull()
+			} else {
+				rightVal := rightFloat.Value(i)
+				if rightVal == 0.0 {
+					return nil, fmt.Errorf("division by zero at index %d", i)
+				}
+				builder.Append(leftFloat.Value(i) / rightVal)
+			}
+		}
+
+		return builder.NewArray(), nil
+	}
+
+	// Handle Int64 division (integer division)
+	if left.DataType().ID() == arrow.INT64 && right.DataType().ID() == arrow.INT64 {
+		builder := array.NewInt64Builder(pool)
+		defer builder.Release()
+
+		leftInt := left.(*array.Int64)
+		rightInt := right.(*array.Int64)
+
+		for i := 0; i < left.Len(); i++ {
+			if leftInt.IsNull(i) || rightInt.IsNull(i) {
+				builder.AppendNull()
+			} else {
+				rightVal := rightInt.Value(i)
+				if rightVal == 0 {
+					return nil, fmt.Errorf("division by zero at index %d", i)
+				}
+				builder.Append(leftInt.Value(i) / rightVal)
+			}
+		}
+
+		return builder.NewArray(), nil
+	}
+
+	return nil, fmt.Errorf("unsupported types for division: %s / %s", left.DataType(), right.DataType())
 }
 
 // Name implements Expr.Name for binary operations.
@@ -418,6 +669,22 @@ func (b *BinaryExpr) Lt(other Expr) Expr {
 
 func (b *BinaryExpr) Eq(other Expr) Expr {
 	return NewBinaryExpr(b, other, "equal")
+}
+
+// Helper functions for safe type assertions
+func asFloat64Array(arr arrow.Array) (*array.Float64, bool) {
+	f64arr, ok := arr.(*array.Float64)
+	return f64arr, ok
+}
+
+func asInt64Array(arr arrow.Array) (*array.Int64, bool) {
+	i64arr, ok := arr.(*array.Int64)
+	return i64arr, ok
+}
+
+func asStringArray(arr arrow.Array) (*array.String, bool) {
+	strArr, ok := arr.(*array.String)
+	return strArr, ok
 }
 
 // Helper function to infer Arrow data type from Go value

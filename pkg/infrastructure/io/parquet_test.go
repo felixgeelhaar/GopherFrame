@@ -24,48 +24,29 @@ func TestParquetWriter_NewParquetWriter(t *testing.T) {
 	}
 }
 
-func TestParquetReader_ReadFile_NotImplemented(t *testing.T) {
+func TestParquetReader_ReadFile_NonExistentFile(t *testing.T) {
 	reader := NewParquetReader()
-	_, err := reader.ReadFile("test.parquet")
+	_, err := reader.ReadFile("nonexistent.parquet")
 	if err == nil {
-		t.Error("Expected error for reading")
+		t.Error("Expected error for non-existent file")
 	}
-	// Could fail at file open or at the not-implemented check, both are valid
-	if err != nil {
-		// Success - the functionality correctly returns an error
-		return
-	}
+	// Should get a file not found error
 }
 
-func TestParquetWriter_WriteFile_NotImplemented(t *testing.T) {
+func TestParquetWriter_WriteFile_NilDataFrame(t *testing.T) {
 	writer := NewParquetWriter()
 
-	pool := memory.NewGoAllocator()
-	schema := arrow.NewSchema(
-		[]arrow.Field{{Name: "test", Type: arrow.PrimitiveTypes.Int64}},
-		nil,
-	)
-
-	builder := array.NewInt64Builder(pool)
-	builder.Append(42)
-	arr := builder.NewArray()
-	defer arr.Release()
-
-	record := array.NewRecord(schema, []arrow.Array{arr}, 1)
-	df := dataframe.NewDataFrame(record)
-	defer df.Release()
-
-	err := writer.WriteFile(df, "test.parquet")
+	err := writer.WriteFile(nil, "test.parquet")
 	if err == nil {
-		t.Error("Expected error for unimplemented functionality")
+		t.Error("Expected error for nil DataFrame")
 	}
-	if err.Error() != "parquet writing not yet implemented in DDD structure" {
+	if err.Error() != "DataFrame cannot be nil" {
 		t.Errorf("Unexpected error message: %v", err)
 	}
 }
 
-func TestParquetAPI_Exists(t *testing.T) {
-	// Test that the API exists and can be instantiated
+func TestParquetAPI_WorksCorrectly(t *testing.T) {
+	// Test that the API exists and works correctly
 	tempDir := t.TempDir()
 	testFile := filepath.Join(tempDir, "test.parquet")
 
@@ -80,10 +61,10 @@ func TestParquetAPI_Exists(t *testing.T) {
 		t.Error("NewParquetWriter returned nil")
 	}
 
-	// Test that the methods exist and return expected "not implemented" errors
+	// Test that reading non-existent file returns error
 	_, err := reader.ReadFile(testFile)
 	if err == nil {
-		t.Error("Expected ReadFile to return error for unimplemented functionality")
+		t.Error("Expected ReadFile to return error for non-existent file")
 	}
 
 	// Create a minimal DataFrame for testing the writer
@@ -101,8 +82,21 @@ func TestParquetAPI_Exists(t *testing.T) {
 	df := dataframe.NewDataFrame(record)
 	defer df.Release()
 
+	// Test writing works correctly
 	err = writer.WriteFile(df, testFile)
-	if err == nil {
-		t.Error("Expected WriteFile to return error for unimplemented functionality")
+	if err != nil {
+		t.Errorf("WriteFile failed: %v", err)
+	}
+
+	// Test reading the written file works
+	readDF, err := reader.ReadFile(testFile)
+	if err != nil {
+		t.Errorf("ReadFile failed: %v", err)
+	}
+	if readDF != nil {
+		defer readDF.Release()
+		if readDF.NumRows() != 1 {
+			t.Errorf("Expected 1 row, got %d", readDF.NumRows())
+		}
 	}
 }

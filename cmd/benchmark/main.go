@@ -81,6 +81,7 @@ func main() {
 	start := time.Now()
 	err := gf.WriteParquet(df, "benchmark_test.parquet")
 	if err != nil {
+		df.Release()
 		log.Fatalf("Failed to write Parquet: %v", err)
 	}
 	parquetWriteTime := time.Since(start)

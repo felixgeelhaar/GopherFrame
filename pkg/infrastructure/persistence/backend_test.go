@@ -81,14 +81,14 @@ func NewMemoryBackend() *MemoryBackend {
 	}
 }
 
-func (m *MemoryBackend) Read(ctx context.Context, source string, opts ReadOptions) (RecordReader, error) {
+func (m *MemoryBackend) Read(_ context.Context, source string, _ ReadOptions) (RecordReader, error) {
 	if _, exists := m.data[source]; !exists {
 		return nil, ErrSourceNotFound
 	}
 	return &mockRecordReader{}, nil
 }
 
-func (m *MemoryBackend) Write(ctx context.Context, destination string, records RecordReader, opts WriteOptions) error {
+func (m *MemoryBackend) Write(_ context.Context, destination string, records RecordReader, _ WriteOptions) error {
 	if records == nil {
 		return ErrInvalidSource
 	}
@@ -96,7 +96,7 @@ func (m *MemoryBackend) Write(ctx context.Context, destination string, records R
 	return nil
 }
 
-func (m *MemoryBackend) Scan(ctx context.Context, pattern string) ([]SourceInfo, error) {
+func (m *MemoryBackend) Scan(_ context.Context, _ string) ([]SourceInfo, error) {
 	var results []SourceInfo
 	for name := range m.data {
 		results = append(results, SourceInfo{
@@ -108,7 +108,7 @@ func (m *MemoryBackend) Scan(ctx context.Context, pattern string) ([]SourceInfo,
 	return results, nil
 }
 
-func (m *MemoryBackend) Schema(ctx context.Context, source string) (*arrow.Schema, error) {
+func (m *MemoryBackend) Schema(_ context.Context, source string) (*arrow.Schema, error) {
 	if _, exists := m.data[source]; !exists {
 		return nil, ErrSourceNotFound
 	}

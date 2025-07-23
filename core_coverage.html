@@ -1,0 +1,1248 @@
+
+<!DOCTYPE html>
+<html>
+	<head>
+		<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+		<title>core: Go Coverage Report</title>
+		<style>
+			body {
+				background: black;
+				color: rgb(80, 80, 80);
+			}
+			body, pre, #legend span {
+				font-family: Menlo, monospace;
+				font-weight: bold;
+			}
+			#topbar {
+				background: black;
+				position: fixed;
+				top: 0; left: 0; right: 0;
+				height: 42px;
+				border-bottom: 1px solid rgb(80, 80, 80);
+			}
+			#content {
+				margin-top: 50px;
+			}
+			#nav, #legend {
+				float: left;
+				margin-left: 10px;
+			}
+			#legend {
+				margin-top: 12px;
+			}
+			#nav {
+				margin-top: 10px;
+			}
+			#legend span {
+				margin: 0 5px;
+			}
+			.cov0 { color: rgb(192, 0, 0) }
+.cov1 { color: rgb(128, 128, 128) }
+.cov2 { color: rgb(116, 140, 131) }
+.cov3 { color: rgb(104, 152, 134) }
+.cov4 { color: rgb(92, 164, 137) }
+.cov5 { color: rgb(80, 176, 140) }
+.cov6 { color: rgb(68, 188, 143) }
+.cov7 { color: rgb(56, 200, 146) }
+.cov8 { color: rgb(44, 212, 149) }
+.cov9 { color: rgb(32, 224, 152) }
+.cov10 { color: rgb(20, 236, 155) }
+
+		</style>
+	</head>
+	<body>
+		<div id="topbar">
+			<div id="nav">
+				<select id="files">
+				
+				<option value="file0">github.com/felixgeelhaar/GopherFrame/pkg/core/dataframe.go (38.4%)</option>
+				
+				<option value="file1">github.com/felixgeelhaar/GopherFrame/pkg/core/series.go (38.3%)</option>
+				
+				</select>
+			</div>
+			<div id="legend">
+				<span>not tracked</span>
+			
+				<span class="cov0">not covered</span>
+				<span class="cov8">covered</span>
+			
+			</div>
+		</div>
+		<div id="content">
+		
+		<pre class="file" id="file0" style="display: none">// Package core provides the internal DataFrame and Series implementations.
+// These are the foundational data structures that wrap Apache Arrow Records
+// and Arrays, providing immutable, strongly-typed operations.
+package core
+
+import (
+        "context"
+        "fmt"
+
+        "github.com/apache/arrow-go/v18/arrow"
+        "github.com/apache/arrow-go/v18/arrow/array"
+        "github.com/apache/arrow-go/v18/arrow/memory"
+        "github.com/felixgeelhaar/GopherFrame/pkg/storage"
+)
+
+// DataFrame is the internal, immutable representation of tabular data.
+// It wraps an arrow.Record to provide zero-copy operations and seamless
+// interoperability with the Arrow ecosystem.
+type DataFrame struct {
+        // record is the underlying Arrow Record containing the actual data.
+        // This is never exposed directly to maintain immutability.
+        record arrow.Record
+
+        // allocator is used for memory management when creating new records.
+        allocator memory.Allocator
+
+        // storage backend for I/O operations (optional)
+        backend storage.Backend
+}
+
+// NewDataFrame creates a new DataFrame from an Arrow Record.
+// The DataFrame takes ownership of the record and will release it when closed.
+func NewDataFrame(record arrow.Record) *DataFrame <span class="cov8" title="1">{
+        record.Retain() // Increment reference count
+        return &amp;DataFrame{
+                record:    record,
+                allocator: memory.DefaultAllocator,
+        }
+}</span>
+
+// NewDataFrameWithAllocator creates a new DataFrame with a custom allocator.
+func NewDataFrameWithAllocator(record arrow.Record, allocator memory.Allocator) *DataFrame <span class="cov0" title="0">{
+        record.Retain()
+        return &amp;DataFrame{
+                record:    record,
+                allocator: allocator,
+        }
+}</span>
+
+// NewDataFrameFromStorage creates a DataFrame by reading from a storage backend.
+func NewDataFrameFromStorage(ctx context.Context, backend storage.Backend, source string, opts storage.ReadOptions) (*DataFrame, error) <span class="cov0" title="0">{
+        reader, err := backend.Read(ctx, source, opts)
+        if err != nil </span><span class="cov0" title="0">{
+                return nil, fmt.Errorf("failed to read from storage: %w", err)
+        }</span>
+        <span class="cov0" title="0">defer func() </span><span class="cov0" title="0">{ _ = reader.Close() }</span>()
+
+        // For now, read the first record. Future versions will handle multiple records.
+        <span class="cov0" title="0">if !reader.Next() </span><span class="cov0" title="0">{
+                if err := reader.Err(); err != nil </span><span class="cov0" title="0">{
+                        return nil, fmt.Errorf("failed to read record: %w", err)
+                }</span>
+                <span class="cov0" title="0">return nil, fmt.Errorf("no records found in source: %s", source)</span>
+        }
+
+        <span class="cov0" title="0">record := reader.Record()
+        record.Retain() // Take ownership
+
+        df := &amp;DataFrame{
+                record:    record,
+                allocator: memory.DefaultAllocator,
+                backend:   backend,
+        }
+
+        return df, nil</span>
+}
+
+// Schema returns the Arrow schema of the DataFrame.
+func (df *DataFrame) Schema() *arrow.Schema <span class="cov8" title="1">{
+        return df.record.Schema()
+}</span>
+
+// NumRows returns the number of rows in the DataFrame.
+func (df *DataFrame) NumRows() int64 <span class="cov8" title="1">{
+        return df.record.NumRows()
+}</span>
+
+// NumCols returns the number of columns in the DataFrame.
+func (df *DataFrame) NumCols() int64 <span class="cov8" title="1">{
+        return df.record.NumCols()
+}</span>
+
+// Record returns the underlying Arrow Record.
+// This is used internally by operations that need direct Arrow access.
+func (df *DataFrame) Record() arrow.Record <span class="cov0" title="0">{
+        return df.record
+}</span>
+
+// ColumnNames returns the names of all columns in order.
+func (df *DataFrame) ColumnNames() []string <span class="cov8" title="1">{
+        schema := df.record.Schema()
+        names := make([]string, schema.NumFields())
+        for i, field := range schema.Fields() </span><span class="cov8" title="1">{
+                names[i] = field.Name
+        }</span>
+        <span class="cov8" title="1">return names</span>
+}
+
+// Column returns a Series for the specified column name.
+func (df *DataFrame) Column(name string) (*Series, error) <span class="cov8" title="1">{
+        schema := df.record.Schema()
+        fieldIndex := -1
+
+        // Find the column index
+        for i, field := range schema.Fields() </span><span class="cov8" title="1">{
+                if field.Name == name </span><span class="cov8" title="1">{
+                        fieldIndex = i
+                        break</span>
+                }
+        }
+
+        <span class="cov8" title="1">if fieldIndex == -1 </span><span class="cov8" title="1">{
+                return nil, fmt.Errorf("column not found: %s", name)
+        }</span>
+
+        <span class="cov8" title="1">column := df.record.Column(fieldIndex)
+        field := schema.Field(fieldIndex)
+
+        return NewSeries(column, field), nil</span>
+}
+
+// ColumnAt returns a Series for the column at the specified index.
+func (df *DataFrame) ColumnAt(index int) (*Series, error) <span class="cov0" title="0">{
+        if index &lt; 0 || index &gt;= int(df.NumCols()) </span><span class="cov0" title="0">{
+                return nil, fmt.Errorf("column index out of range: %d", index)
+        }</span>
+
+        <span class="cov0" title="0">column := df.record.Column(index)
+        field := df.record.Schema().Field(index)
+
+        return NewSeries(column, field), nil</span>
+}
+
+// Columns returns all columns as a slice of Series.
+func (df *DataFrame) Columns() []*Series <span class="cov0" title="0">{
+        numCols := int(df.NumCols())
+        series := make([]*Series, numCols)
+
+        for i := 0; i &lt; numCols; i++ </span><span class="cov0" title="0">{
+                column := df.record.Column(i)
+                field := df.record.Schema().Field(i)
+                series[i] = NewSeries(column, field)
+        }</span>
+
+        <span class="cov0" title="0">return series</span>
+}
+
+// HasColumn checks if a column with the given name exists.
+func (df *DataFrame) HasColumn(name string) bool <span class="cov8" title="1">{
+        schema := df.record.Schema()
+        for _, field := range schema.Fields() </span><span class="cov8" title="1">{
+                if field.Name == name </span><span class="cov8" title="1">{
+                        return true
+                }</span>
+        }
+        <span class="cov8" title="1">return false</span>
+}
+
+// Equal compares two DataFrames for equality.
+// Returns true if they have the same schema and data.
+func (df *DataFrame) Equal(other *DataFrame) bool <span class="cov0" title="0">{
+        if df == other </span><span class="cov0" title="0">{
+                return true
+        }</span>
+
+        <span class="cov0" title="0">if other == nil </span><span class="cov0" title="0">{
+                return false
+        }</span>
+
+        // Compare schemas first
+        <span class="cov0" title="0">if !df.record.Schema().Equal(other.record.Schema()) </span><span class="cov0" title="0">{
+                return false
+        }</span>
+
+        // Compare number of rows
+        <span class="cov0" title="0">if df.record.NumRows() != other.record.NumRows() </span><span class="cov0" title="0">{
+                return false
+        }</span>
+
+        // Compare each column
+        <span class="cov0" title="0">for i := 0; i &lt; int(df.record.NumCols()); i++ </span><span class="cov0" title="0">{
+                if !array.Equal(df.record.Column(i), other.record.Column(i)) </span><span class="cov0" title="0">{
+                        return false
+                }</span>
+        }
+
+        <span class="cov0" title="0">return true</span>
+}
+
+// Validate checks the DataFrame for consistency and data integrity.
+func (df *DataFrame) Validate() error <span class="cov8" title="1">{
+        if df.record == nil </span><span class="cov0" title="0">{
+                return fmt.Errorf("DataFrame has no underlying record")
+        }</span>
+
+        // Validate schema and columns consistency
+        <span class="cov8" title="1">schema := df.record.Schema()
+        if int(df.record.NumCols()) != len(schema.Fields()) </span><span class="cov0" title="0">{
+                return fmt.Errorf("column count mismatch: record has %d columns, schema has %d fields",
+                        df.record.NumCols(), len(schema.Fields()))
+        }</span>
+
+        // Validate each column against its field type
+        <span class="cov8" title="1">for i, field := range schema.Fields() </span><span class="cov8" title="1">{
+                column := df.record.Column(i)
+                if !arrow.TypeEqual(column.DataType(), field.Type) </span><span class="cov0" title="0">{
+                        return fmt.Errorf("column %d type mismatch: expected %s, got %s",
+                                i, field.Type, column.DataType())
+                }</span>
+        }
+
+        <span class="cov8" title="1">return nil</span>
+}
+
+// String returns a string representation of the DataFrame.
+// This is primarily for debugging and should not be used for large DataFrames.
+func (df *DataFrame) String() string <span class="cov0" title="0">{
+        if df.record == nil </span><span class="cov0" title="0">{
+                return "DataFrame{&lt;empty&gt;}"
+        }</span>
+
+        <span class="cov0" title="0">return fmt.Sprintf("DataFrame{rows: %d, cols: %d, schema: %s}",
+                df.NumRows(), df.NumCols(), df.Schema())</span>
+}
+
+// Clone creates a shallow copy of the DataFrame.
+// The underlying Arrow data is shared (copy-on-write semantics).
+func (df *DataFrame) Clone() *DataFrame <span class="cov0" title="0">{
+        df.record.Retain() // Increment reference count
+        return &amp;DataFrame{
+                record:    df.record,
+                allocator: df.allocator,
+                backend:   df.backend,
+        }
+}</span>
+
+// WriteToStorage saves the DataFrame to a storage backend.
+func (df *DataFrame) WriteToStorage(ctx context.Context, backend storage.Backend, destination string, opts storage.WriteOptions) error <span class="cov0" title="0">{
+        if backend == nil </span><span class="cov0" title="0">{
+                if df.backend == nil </span><span class="cov0" title="0">{
+                        return fmt.Errorf("no storage backend available")
+                }</span>
+                <span class="cov0" title="0">backend = df.backend</span>
+        }
+
+        // Create a record reader from this single record
+        <span class="cov0" title="0">reader := &amp;singleRecordReader{
+                record: df.record,
+                schema: df.record.Schema(),
+        }
+
+        return backend.Write(ctx, destination, reader, opts)</span>
+}
+
+// Select returns a new DataFrame with only the specified columns.
+func (df *DataFrame) Select(columnNames []string) (*DataFrame, error) <span class="cov0" title="0">{
+        if len(columnNames) == 0 </span><span class="cov0" title="0">{
+                return nil, fmt.Errorf("no columns specified for selection")
+        }</span>
+
+        <span class="cov0" title="0">schema := df.record.Schema()
+
+        // Find column indices and validate columns exist
+        indices := make([]int, len(columnNames))
+        selectedFields := make([]arrow.Field, len(columnNames))
+
+        for i, name := range columnNames </span><span class="cov0" title="0">{
+                fieldIndex := -1
+                for j, field := range schema.Fields() </span><span class="cov0" title="0">{
+                        if field.Name == name </span><span class="cov0" title="0">{
+                                fieldIndex = j
+                                selectedFields[i] = field
+                                break</span>
+                        }
+                }
+
+                <span class="cov0" title="0">if fieldIndex == -1 </span><span class="cov0" title="0">{
+                        return nil, fmt.Errorf("column not found: %s", name)
+                }</span>
+                <span class="cov0" title="0">indices[i] = fieldIndex</span>
+        }
+
+        // Create new schema with selected fields
+        <span class="cov0" title="0">newSchema := arrow.NewSchema(selectedFields, nil)
+
+        // Extract selected columns
+        selectedColumns := make([]arrow.Array, len(indices))
+        for i, idx := range indices </span><span class="cov0" title="0">{
+                column := df.record.Column(idx)
+                column.Retain() // Retain reference for new record
+                selectedColumns[i] = column
+        }</span>
+
+        // Create new record with selected columns
+        <span class="cov0" title="0">newRecord := array.NewRecord(newSchema, selectedColumns, df.record.NumRows())
+
+        return NewDataFrame(newRecord), nil</span>
+}
+
+// WithColumn returns a new DataFrame with an additional or replaced column.
+func (df *DataFrame) WithColumn(columnName string, newColumn arrow.Array) (*DataFrame, error) <span class="cov0" title="0">{
+        if newColumn == nil </span><span class="cov0" title="0">{
+                return nil, fmt.Errorf("new column cannot be nil")
+        }</span>
+
+        // Validate column length matches DataFrame
+        <span class="cov0" title="0">if int64(newColumn.Len()) != df.NumRows() </span><span class="cov0" title="0">{
+                return nil, fmt.Errorf("column length %d does not match DataFrame rows %d", newColumn.Len(), df.NumRows())
+        }</span>
+
+        <span class="cov0" title="0">newColumn.Retain() // Take ownership
+
+        schema := df.record.Schema()
+
+        // Check if column already exists
+        existingColumnIndex := -1
+        for i, field := range schema.Fields() </span><span class="cov0" title="0">{
+                if field.Name == columnName </span><span class="cov0" title="0">{
+                        existingColumnIndex = i
+                        break</span>
+                }
+        }
+
+        <span class="cov0" title="0">var newFields []arrow.Field
+        var newColumns []arrow.Array
+
+        if existingColumnIndex &gt;= 0 </span><span class="cov0" title="0">{
+                // Replace existing column
+                newFields = make([]arrow.Field, len(schema.Fields()))
+                newColumns = make([]arrow.Array, len(schema.Fields()))
+
+                for i, field := range schema.Fields() </span><span class="cov0" title="0">{
+                        if i == existingColumnIndex </span><span class="cov0" title="0">{
+                                // Replace with new column
+                                newFields[i] = arrow.Field{Name: columnName, Type: newColumn.DataType()}
+                                newColumns[i] = newColumn
+                        }</span> else<span class="cov0" title="0"> {
+                                // Keep existing column
+                                newFields[i] = field
+                                column := df.record.Column(i)
+                                column.Retain()
+                                newColumns[i] = column
+                        }</span>
+                }
+        } else<span class="cov0" title="0"> {
+                // Add new column
+                newFields = make([]arrow.Field, len(schema.Fields())+1)
+                newColumns = make([]arrow.Array, len(schema.Fields())+1)
+
+                // Copy existing fields and columns
+                for i, field := range schema.Fields() </span><span class="cov0" title="0">{
+                        newFields[i] = field
+                        column := df.record.Column(i)
+                        column.Retain()
+                        newColumns[i] = column
+                }</span>
+
+                // Add new column
+                <span class="cov0" title="0">newFields[len(schema.Fields())] = arrow.Field{Name: columnName, Type: newColumn.DataType()}
+                newColumns[len(schema.Fields())] = newColumn</span>
+        }
+
+        // Create new schema and record
+        <span class="cov0" title="0">newSchema := arrow.NewSchema(newFields, nil)
+        newRecord := array.NewRecord(newSchema, newColumns, df.record.NumRows())
+
+        return NewDataFrame(newRecord), nil</span>
+}
+
+// Filter returns a new DataFrame containing only rows where the predicate is true.
+func (df *DataFrame) Filter(predicateArray arrow.Array) (*DataFrame, error) <span class="cov0" title="0">{
+        // Validate that predicate is boolean array
+        if predicateArray.DataType().ID() != arrow.BOOL </span><span class="cov0" title="0">{
+                return nil, fmt.Errorf("filter predicate must be boolean array, got %s", predicateArray.DataType())
+        }</span>
+
+        // Validate length matches DataFrame
+        <span class="cov0" title="0">if int64(predicateArray.Len()) != df.NumRows() </span><span class="cov0" title="0">{
+                return nil, fmt.Errorf("predicate length %d does not match DataFrame rows %d", predicateArray.Len(), df.NumRows())
+        }</span>
+
+        <span class="cov0" title="0">boolArray, ok := predicateArray.(*array.Boolean)
+        if !ok </span><span class="cov0" title="0">{
+                return nil, fmt.Errorf("failed to cast predicate to boolean array")
+        }</span>
+
+        // Count true values to determine result size
+        <span class="cov0" title="0">trueCount := int64(0)
+        for i := 0; i &lt; boolArray.Len(); i++ </span><span class="cov0" title="0">{
+                if !boolArray.IsNull(i) &amp;&amp; boolArray.Value(i) </span><span class="cov0" title="0">{
+                        trueCount++
+                }</span>
+        }
+
+        <span class="cov0" title="0">if trueCount == 0 </span><span class="cov0" title="0">{
+                // Return empty DataFrame with same schema
+                schema := df.record.Schema()
+                emptyColumns := make([]arrow.Array, len(schema.Fields()))
+
+                pool := memory.NewGoAllocator()
+                for i, field := range schema.Fields() </span><span class="cov0" title="0">{
+                        switch field.Type.ID() </span>{
+                        case arrow.INT64:<span class="cov0" title="0">
+                                builder := array.NewInt64Builder(pool)
+                                emptyColumns[i] = builder.NewArray()
+                                builder.Release()</span>
+                        case arrow.FLOAT64:<span class="cov0" title="0">
+                                builder := array.NewFloat64Builder(pool)
+                                emptyColumns[i] = builder.NewArray()
+                                builder.Release()</span>
+                        case arrow.STRING:<span class="cov0" title="0">
+                                builder := array.NewStringBuilder(pool)
+                                emptyColumns[i] = builder.NewArray()
+                                builder.Release()</span>
+                        default:<span class="cov0" title="0">
+                                return nil, fmt.Errorf("unsupported data type for empty filter: %s", field.Type)</span>
+                        }
+                }
+
+                <span class="cov0" title="0">emptyRecord := array.NewRecord(schema, emptyColumns, 0)
+                return NewDataFrame(emptyRecord), nil</span>
+        }
+
+        // Create filtered columns
+        <span class="cov0" title="0">schema := df.record.Schema()
+        filteredColumns := make([]arrow.Array, len(schema.Fields()))
+
+        pool := memory.NewGoAllocator()
+        for colIdx, field := range schema.Fields() </span><span class="cov0" title="0">{
+                column := df.record.Column(colIdx)
+
+                switch field.Type.ID() </span>{
+                case arrow.INT64:<span class="cov0" title="0">
+                        srcArray, ok := column.(*array.Int64)
+                        if !ok </span><span class="cov0" title="0">{
+                                return nil, fmt.Errorf("expected Int64 array for column %d", colIdx)
+                        }</span>
+                        <span class="cov0" title="0">builder := array.NewInt64Builder(pool)
+
+                        for i := 0; i &lt; boolArray.Len(); i++ </span><span class="cov0" title="0">{
+                                if !boolArray.IsNull(i) &amp;&amp; boolArray.Value(i) </span><span class="cov0" title="0">{
+                                        if srcArray.IsNull(i) </span><span class="cov0" title="0">{
+                                                builder.AppendNull()
+                                        }</span> else<span class="cov0" title="0"> {
+                                                builder.Append(srcArray.Value(i))
+                                        }</span>
+                                }
+                        }
+                        <span class="cov0" title="0">filteredColumns[colIdx] = builder.NewArray()
+                        builder.Release()</span>
+
+                case arrow.FLOAT64:<span class="cov0" title="0">
+                        srcArray, ok := column.(*array.Float64)
+                        if !ok </span><span class="cov0" title="0">{
+                                return nil, fmt.Errorf("expected Float64 array for column %d", colIdx)
+                        }</span>
+                        <span class="cov0" title="0">builder := array.NewFloat64Builder(pool)
+
+                        for i := 0; i &lt; boolArray.Len(); i++ </span><span class="cov0" title="0">{
+                                if !boolArray.IsNull(i) &amp;&amp; boolArray.Value(i) </span><span class="cov0" title="0">{
+                                        if srcArray.IsNull(i) </span><span class="cov0" title="0">{
+                                                builder.AppendNull()
+                                        }</span> else<span class="cov0" title="0"> {
+                                                builder.Append(srcArray.Value(i))
+                                        }</span>
+                                }
+                        }
+                        <span class="cov0" title="0">filteredColumns[colIdx] = builder.NewArray()
+                        builder.Release()</span>
+
+                case arrow.STRING:<span class="cov0" title="0">
+                        srcArray, ok := column.(*array.String)
+                        if !ok </span><span class="cov0" title="0">{
+                                return nil, fmt.Errorf("expected String array for column %d", colIdx)
+                        }</span>
+                        <span class="cov0" title="0">builder := array.NewStringBuilder(pool)
+
+                        for i := 0; i &lt; boolArray.Len(); i++ </span><span class="cov0" title="0">{
+                                if !boolArray.IsNull(i) &amp;&amp; boolArray.Value(i) </span><span class="cov0" title="0">{
+                                        if srcArray.IsNull(i) </span><span class="cov0" title="0">{
+                                                builder.AppendNull()
+                                        }</span> else<span class="cov0" title="0"> {
+                                                builder.Append(srcArray.Value(i))
+                                        }</span>
+                                }
+                        }
+                        <span class="cov0" title="0">filteredColumns[colIdx] = builder.NewArray()
+                        builder.Release()</span>
+
+                default:<span class="cov0" title="0">
+                        return nil, fmt.Errorf("unsupported data type for filtering: %s", field.Type)</span>
+                }
+        }
+
+        // Create new record with filtered data
+        <span class="cov0" title="0">filteredRecord := array.NewRecord(schema, filteredColumns, trueCount)
+        return NewDataFrame(filteredRecord), nil</span>
+}
+
+// SortKey represents a sorting specification for multi-column sorts
+type SortKey struct {
+        Column    string
+        Ascending bool
+}
+
+// Sort returns a new DataFrame sorted by the specified column.
+func (df *DataFrame) Sort(columnName string, ascending bool) (*DataFrame, error) <span class="cov8" title="1">{
+        return df.SortMultiple([]SortKey{{Column: columnName, Ascending: ascending}})
+}</span>
+
+// SortMultiple returns a new DataFrame sorted by multiple columns in the specified order.
+func (df *DataFrame) SortMultiple(sortKeys []SortKey) (*DataFrame, error) <span class="cov8" title="1">{
+        if len(sortKeys) == 0 </span><span class="cov8" title="1">{
+                return nil, fmt.Errorf("no sort keys provided")
+        }</span>
+
+        // Validate all columns exist
+        <span class="cov8" title="1">schema := df.record.Schema()
+        for _, key := range sortKeys </span><span class="cov8" title="1">{
+                found := false
+                for _, field := range schema.Fields() </span><span class="cov8" title="1">{
+                        if field.Name == key.Column </span><span class="cov8" title="1">{
+                                found = true
+                                break</span>
+                        }
+                }
+                <span class="cov8" title="1">if !found </span><span class="cov8" title="1">{
+                        return nil, fmt.Errorf("column not found: %s", key.Column)
+                }</span>
+        }
+
+        // Get the number of rows
+        <span class="cov8" title="1">numRows := int(df.NumRows())
+        if numRows == 0 </span><span class="cov0" title="0">{
+                return df.Clone(), nil
+        }</span>
+
+        // Create row indices
+        <span class="cov8" title="1">indices := make([]int, numRows)
+        for i := 0; i &lt; numRows; i++ </span><span class="cov8" title="1">{
+                indices[i] = i
+        }</span>
+
+        // Sort indices based on the column values
+        <span class="cov8" title="1">err := df.sortIndices(indices, sortKeys)
+        if err != nil </span><span class="cov0" title="0">{
+                return nil, fmt.Errorf("failed to sort indices: %w", err)
+        }</span>
+
+        // Create new arrays with sorted data
+        <span class="cov8" title="1">newColumns := make([]arrow.Array, df.NumCols())
+        pool := memory.NewGoAllocator()
+
+        for colIdx, field := range schema.Fields() </span><span class="cov8" title="1">{
+                column := df.record.Column(colIdx)
+
+                switch field.Type.ID() </span>{
+                case arrow.INT64:<span class="cov8" title="1">
+                        srcArray, ok := column.(*array.Int64)
+                        if !ok </span><span class="cov0" title="0">{
+                                return nil, fmt.Errorf("expected Int64 array for column %d", colIdx)
+                        }</span>
+                        <span class="cov8" title="1">builder := array.NewInt64Builder(pool)
+                        defer builder.Release()
+
+                        for _, idx := range indices </span><span class="cov8" title="1">{
+                                if srcArray.IsNull(idx) </span><span class="cov0" title="0">{
+                                        builder.AppendNull()
+                                }</span> else<span class="cov8" title="1"> {
+                                        builder.Append(srcArray.Value(idx))
+                                }</span>
+                        }
+                        <span class="cov8" title="1">newColumns[colIdx] = builder.NewArray()</span>
+
+                case arrow.FLOAT64:<span class="cov8" title="1">
+                        srcArray, ok := column.(*array.Float64)
+                        if !ok </span><span class="cov0" title="0">{
+                                return nil, fmt.Errorf("expected Float64 array for column %d", colIdx)
+                        }</span>
+                        <span class="cov8" title="1">builder := array.NewFloat64Builder(pool)
+                        defer builder.Release()
+
+                        for _, idx := range indices </span><span class="cov8" title="1">{
+                                if srcArray.IsNull(idx) </span><span class="cov0" title="0">{
+                                        builder.AppendNull()
+                                }</span> else<span class="cov8" title="1"> {
+                                        builder.Append(srcArray.Value(idx))
+                                }</span>
+                        }
+                        <span class="cov8" title="1">newColumns[colIdx] = builder.NewArray()</span>
+
+                case arrow.STRING:<span class="cov8" title="1">
+                        srcArray, ok := column.(*array.String)
+                        if !ok </span><span class="cov0" title="0">{
+                                return nil, fmt.Errorf("expected String array for column %d", colIdx)
+                        }</span>
+                        <span class="cov8" title="1">builder := array.NewStringBuilder(pool)
+                        defer builder.Release()
+
+                        for _, idx := range indices </span><span class="cov8" title="1">{
+                                if srcArray.IsNull(idx) </span><span class="cov0" title="0">{
+                                        builder.AppendNull()
+                                }</span> else<span class="cov8" title="1"> {
+                                        builder.Append(srcArray.Value(idx))
+                                }</span>
+                        }
+                        <span class="cov8" title="1">newColumns[colIdx] = builder.NewArray()</span>
+
+                case arrow.BOOL:<span class="cov0" title="0">
+                        srcArray, ok := column.(*array.Boolean)
+                        if !ok </span><span class="cov0" title="0">{
+                                return nil, fmt.Errorf("expected Boolean array for column %d", colIdx)
+                        }</span>
+                        <span class="cov0" title="0">builder := array.NewBooleanBuilder(pool)
+                        defer builder.Release()
+
+                        for _, idx := range indices </span><span class="cov0" title="0">{
+                                if srcArray.IsNull(idx) </span><span class="cov0" title="0">{
+                                        builder.AppendNull()
+                                }</span> else<span class="cov0" title="0"> {
+                                        builder.Append(srcArray.Value(idx))
+                                }</span>
+                        }
+                        <span class="cov0" title="0">newColumns[colIdx] = builder.NewArray()</span>
+
+                default:<span class="cov0" title="0">
+                        return nil, fmt.Errorf("unsupported data type for sorting: %s", field.Type)</span>
+                }
+        }
+
+        // Create new record with sorted data
+        <span class="cov8" title="1">sortedRecord := array.NewRecord(schema, newColumns, df.record.NumRows())
+        return NewDataFrame(sortedRecord), nil</span>
+}
+
+// sortIndices sorts the indices array based on the specified sort keys using a stable sort
+func (df *DataFrame) sortIndices(indices []int, sortKeys []SortKey) error <span class="cov8" title="1">{
+        schema := df.record.Schema()
+
+        // Get column indices for sort keys
+        sortColumnIndices := make([]int, len(sortKeys))
+        for i, key := range sortKeys </span><span class="cov8" title="1">{
+                found := false
+                for j, field := range schema.Fields() </span><span class="cov8" title="1">{
+                        if field.Name == key.Column </span><span class="cov8" title="1">{
+                                sortColumnIndices[i] = j
+                                found = true
+                                break</span>
+                        }
+                }
+                <span class="cov8" title="1">if !found </span><span class="cov0" title="0">{
+                        return fmt.Errorf("column not found: %s", key.Column)
+                }</span>
+        }
+
+        // Custom comparison function for sorting
+        <span class="cov8" title="1">less := func(i, j int) bool </span><span class="cov8" title="1">{
+                idxI, idxJ := indices[i], indices[j]
+
+                for k, key := range sortKeys </span><span class="cov8" title="1">{
+                        colIdx := sortColumnIndices[k]
+                        column := df.record.Column(colIdx)
+                        field := schema.Field(colIdx)
+
+                        cmp := df.compareValues(column, field.Type, idxI, idxJ)
+                        if cmp != 0 </span><span class="cov8" title="1">{
+                                if key.Ascending </span><span class="cov8" title="1">{
+                                        return cmp &lt; 0
+                                }</span> else<span class="cov8" title="1"> {
+                                        return cmp &gt; 0
+                                }</span>
+                        }
+                }
+                <span class="cov8" title="1">return false</span> // Equal values
+        }
+
+        // Use a stable sort to maintain relative order for equal values
+        <span class="cov8" title="1">df.stableSort(indices, less)
+        return nil</span>
+}
+
+// compareValues compares two values at given indices in a column
+// Returns -1 if left &lt; right, 0 if equal, 1 if left &gt; right
+func (df *DataFrame) compareValues(column arrow.Array, dataType arrow.DataType, leftIdx, rightIdx int) int <span class="cov8" title="1">{
+        // Handle null values (nulls sort last)
+        leftNull := column.IsNull(leftIdx)
+        rightNull := column.IsNull(rightIdx)
+
+        if leftNull &amp;&amp; rightNull </span><span class="cov0" title="0">{
+                return 0
+        }</span>
+        <span class="cov8" title="1">if leftNull </span><span class="cov0" title="0">{
+                return 1 // null sorts after non-null
+        }</span>
+        <span class="cov8" title="1">if rightNull </span><span class="cov0" title="0">{
+                return -1 // non-null sorts before null
+        }</span>
+
+        <span class="cov8" title="1">switch dataType.ID() </span>{
+        case arrow.INT64:<span class="cov8" title="1">
+                arr, ok := column.(*array.Int64)
+                if !ok </span><span class="cov0" title="0">{
+                        return 0
+                }</span>
+                <span class="cov8" title="1">left, right := arr.Value(leftIdx), arr.Value(rightIdx)
+                if left &lt; right </span><span class="cov8" title="1">{
+                        return -1
+                }</span> else<span class="cov8" title="1"> if left &gt; right </span><span class="cov8" title="1">{
+                        return 1
+                }</span>
+                <span class="cov8" title="1">return 0</span>
+
+        case arrow.FLOAT64:<span class="cov8" title="1">
+                arr, ok := column.(*array.Float64)
+                if !ok </span><span class="cov0" title="0">{
+                        return 0
+                }</span>
+                <span class="cov8" title="1">left, right := arr.Value(leftIdx), arr.Value(rightIdx)
+                if left &lt; right </span><span class="cov8" title="1">{
+                        return -1
+                }</span> else<span class="cov8" title="1"> if left &gt; right </span><span class="cov8" title="1">{
+                        return 1
+                }</span>
+                <span class="cov0" title="0">return 0</span>
+
+        case arrow.STRING:<span class="cov8" title="1">
+                arr := column.(*array.String)
+                left, right := arr.Value(leftIdx), arr.Value(rightIdx)
+                if left &lt; right </span><span class="cov8" title="1">{
+                        return -1
+                }</span> else<span class="cov8" title="1"> if left &gt; right </span><span class="cov8" title="1">{
+                        return 1
+                }</span>
+                <span class="cov8" title="1">return 0</span>
+
+        case arrow.BOOL:<span class="cov0" title="0">
+                arr := column.(*array.Boolean)
+                left, right := arr.Value(leftIdx), arr.Value(rightIdx)
+                // false &lt; true
+                if !left &amp;&amp; right </span><span class="cov0" title="0">{
+                        return -1
+                }</span> else<span class="cov0" title="0"> if left &amp;&amp; !right </span><span class="cov0" title="0">{
+                        return 1
+                }</span>
+                <span class="cov0" title="0">return 0</span>
+
+        default:<span class="cov0" title="0">
+                return 0</span> // Unsupported types are considered equal
+        }
+}
+
+// stableSort implements a stable sort algorithm (insertion sort for simplicity)
+func (df *DataFrame) stableSort(indices []int, less func(i, j int) bool) <span class="cov8" title="1">{
+        for i := 1; i &lt; len(indices); i++ </span><span class="cov8" title="1">{
+                for j := i; j &gt; 0 &amp;&amp; less(j, j-1); j-- </span><span class="cov8" title="1">{
+                        indices[j], indices[j-1] = indices[j-1], indices[j]
+                }</span>
+        }
+}
+
+// Release decrements the reference count of the underlying Arrow Record.
+// The DataFrame should not be used after calling Release().
+func (df *DataFrame) Release() <span class="cov8" title="1">{
+        if df.record != nil </span><span class="cov8" title="1">{
+                df.record.Release()
+                df.record = nil
+        }</span>
+}
+
+// singleRecordReader implements storage.RecordReader for a single Arrow Record.
+// This is used when writing a DataFrame to storage.
+type singleRecordReader struct {
+        record   arrow.Record
+        schema   *arrow.Schema
+        consumed bool
+        err      error
+}
+
+func (r *singleRecordReader) Next() bool <span class="cov0" title="0">{
+        return !r.consumed &amp;&amp; r.err == nil
+}</span>
+
+func (r *singleRecordReader) Record() arrow.Record <span class="cov0" title="0">{
+        if r.consumed </span><span class="cov0" title="0">{
+                return nil
+        }</span>
+        <span class="cov0" title="0">r.consumed = true
+        return r.record</span>
+}
+
+func (r *singleRecordReader) Schema() *arrow.Schema <span class="cov0" title="0">{
+        return r.schema
+}</span>
+
+func (r *singleRecordReader) Err() error <span class="cov0" title="0">{
+        return r.err
+}</span>
+
+func (r *singleRecordReader) Close() error <span class="cov0" title="0">{
+        return nil // No resources to clean up
+}</span>
+</pre>
+		
+		<pre class="file" id="file1" style="display: none">// Package core provides Series implementation wrapping Apache Arrow Arrays.
+package core
+
+import (
+        "fmt"
+
+        "github.com/apache/arrow-go/v18/arrow"
+        "github.com/apache/arrow-go/v18/arrow/array"
+)
+
+// Series represents an immutable, one-dimensional array of data.
+// It wraps an Arrow Array to provide type-safe operations and
+// seamless interoperability with the Arrow ecosystem.
+type Series struct {
+        // array is the underlying Arrow Array containing the actual data.
+        array arrow.Array
+
+        // field contains the column metadata (name, type, nullable).
+        field arrow.Field
+}
+
+// NewSeries creates a new Series from an Arrow Array and Field.
+// The Series takes ownership of the array and will release it when closed.
+func NewSeries(arr arrow.Array, field arrow.Field) *Series <span class="cov8" title="1">{
+        arr.Retain() // Increment reference count
+        return &amp;Series{
+                array: arr,
+                field: field,
+        }
+}</span>
+
+// NewSeriesFromData creates a Series from raw data using Arrow builders.
+// T must be a supported Arrow data type.
+func NewSeriesFromData[T any](name string, data []T) (*Series, error) <span class="cov0" title="0">{
+        // This is a simplified version. Production implementation would
+        // handle all Arrow data types and use proper builders.
+        return nil, fmt.Errorf("NewSeriesFromData not yet implemented")
+}</span>
+
+// Name returns the name of the Series (column name).
+func (s *Series) Name() string <span class="cov8" title="1">{
+        return s.field.Name
+}</span>
+
+// DataType returns the Arrow data type of the Series.
+func (s *Series) DataType() arrow.DataType <span class="cov8" title="1">{
+        return s.field.Type
+}</span>
+
+// Field returns the Arrow field metadata.
+func (s *Series) Field() arrow.Field <span class="cov0" title="0">{
+        return s.field
+}</span>
+
+// Array returns the underlying Arrow Array.
+// This is used internally by operations that need direct Arrow access.
+func (s *Series) Array() arrow.Array <span class="cov8" title="1">{
+        return s.array
+}</span>
+
+// Len returns the number of elements in the Series.
+func (s *Series) Len() int <span class="cov8" title="1">{
+        return s.array.Len()
+}</span>
+
+// Null returns the number of null values in the Series.
+func (s *Series) Null() int <span class="cov8" title="1">{
+        return s.array.NullN()
+}</span>
+
+// IsNull returns true if the value at index i is null.
+func (s *Series) IsNull(i int) bool <span class="cov8" title="1">{
+        return s.array.IsNull(i)
+}</span>
+
+// IsValid returns true if the value at index i is not null.
+func (s *Series) IsValid(i int) bool <span class="cov8" title="1">{
+        return s.array.IsValid(i)
+}</span>
+
+// Nullable returns true if the Series can contain null values.
+func (s *Series) Nullable() bool <span class="cov0" title="0">{
+        return s.field.Nullable
+}</span>
+
+// GetValue returns the value at index i as an interface{}.
+// Returns nil if the value is null.
+func (s *Series) GetValue(i int) interface{} <span class="cov8" title="1">{
+        if i &lt; 0 || i &gt;= s.Len() </span><span class="cov0" title="0">{
+                return nil
+        }</span>
+
+        <span class="cov8" title="1">if s.IsNull(i) </span><span class="cov8" title="1">{
+                return nil
+        }</span>
+
+        // Extract value based on array type
+        <span class="cov8" title="1">switch arr := s.array.(type) </span>{
+        case *array.Int64:<span class="cov8" title="1">
+                return arr.Value(i)</span>
+        case *array.Float64:<span class="cov0" title="0">
+                return arr.Value(i)</span>
+        case *array.String:<span class="cov0" title="0">
+                return arr.Value(i)</span>
+        case *array.Boolean:<span class="cov0" title="0">
+                return arr.Value(i)</span>
+        default:<span class="cov0" title="0">
+                // Fallback: convert to string representation
+                return fmt.Sprintf("&lt;%s&gt;", s.array.DataType())</span>
+        }
+}
+
+// GetString returns the value at index i as a string.
+// This works for string types and provides string representation for others.
+func (s *Series) GetString(i int) (string, error) <span class="cov8" title="1">{
+        if i &lt; 0 || i &gt;= s.Len() </span><span class="cov0" title="0">{
+                return "", fmt.Errorf("index out of range: %d", i)
+        }</span>
+
+        <span class="cov8" title="1">if s.IsNull(i) </span><span class="cov0" title="0">{
+                return "", nil
+        }</span>
+
+        // Convert value to string based on array type
+        <span class="cov8" title="1">switch arr := s.array.(type) </span>{
+        case *array.String:<span class="cov8" title="1">
+                return arr.Value(i), nil</span>
+        case *array.Int64:<span class="cov0" title="0">
+                return fmt.Sprintf("%d", arr.Value(i)), nil</span>
+        case *array.Float64:<span class="cov0" title="0">
+                return fmt.Sprintf("%g", arr.Value(i)), nil</span>
+        case *array.Boolean:<span class="cov0" title="0">
+                return fmt.Sprintf("%t", arr.Value(i)), nil</span>
+        default:<span class="cov0" title="0">
+                return fmt.Sprintf("&lt;%s&gt;", s.array.DataType()), nil</span>
+        }
+}
+
+// GetInt64 returns the value at index i as an int64.
+// This works for integer types and attempts conversion for others.
+func (s *Series) GetInt64(i int) (int64, error) <span class="cov0" title="0">{
+        if i &lt; 0 || i &gt;= s.Len() </span><span class="cov0" title="0">{
+                return 0, fmt.Errorf("index out of range: %d", i)
+        }</span>
+
+        <span class="cov0" title="0">if s.IsNull(i) </span><span class="cov0" title="0">{
+                return 0, fmt.Errorf("null value at index %d", i)
+        }</span>
+
+        <span class="cov0" title="0">switch arr := s.array.(type) </span>{
+        case *array.Int64:<span class="cov0" title="0">
+                return arr.Value(i), nil</span>
+        case *array.Int32:<span class="cov0" title="0">
+                return int64(arr.Value(i)), nil</span>
+        case *array.Int16:<span class="cov0" title="0">
+                return int64(arr.Value(i)), nil</span>
+        case *array.Int8:<span class="cov0" title="0">
+                return int64(arr.Value(i)), nil</span>
+        case *array.Uint64:<span class="cov0" title="0">
+                return int64(arr.Value(i)), nil</span>
+        case *array.Uint32:<span class="cov0" title="0">
+                return int64(arr.Value(i)), nil</span>
+        case *array.Uint16:<span class="cov0" title="0">
+                return int64(arr.Value(i)), nil</span>
+        case *array.Uint8:<span class="cov0" title="0">
+                return int64(arr.Value(i)), nil</span>
+        default:<span class="cov0" title="0">
+                return 0, fmt.Errorf("cannot convert %s to int64", s.DataType())</span>
+        }
+}
+
+// GetFloat64 returns the value at index i as a float64.
+func (s *Series) GetFloat64(i int) (float64, error) <span class="cov0" title="0">{
+        if i &lt; 0 || i &gt;= s.Len() </span><span class="cov0" title="0">{
+                return 0, fmt.Errorf("index out of range: %d", i)
+        }</span>
+
+        <span class="cov0" title="0">if s.IsNull(i) </span><span class="cov0" title="0">{
+                return 0, fmt.Errorf("null value at index %d", i)
+        }</span>
+
+        <span class="cov0" title="0">switch arr := s.array.(type) </span>{
+        case *array.Float64:<span class="cov0" title="0">
+                return arr.Value(i), nil</span>
+        case *array.Float32:<span class="cov0" title="0">
+                return float64(arr.Value(i)), nil</span>
+        default:<span class="cov0" title="0">
+                // Try to convert from integer types
+                if intVal, err := s.GetInt64(i); err == nil </span><span class="cov0" title="0">{
+                        return float64(intVal), nil
+                }</span>
+                <span class="cov0" title="0">return 0, fmt.Errorf("cannot convert %s to float64", s.DataType())</span>
+        }
+}
+
+// GetBool returns the value at index i as a boolean.
+func (s *Series) GetBool(i int) (bool, error) <span class="cov0" title="0">{
+        if i &lt; 0 || i &gt;= s.Len() </span><span class="cov0" title="0">{
+                return false, fmt.Errorf("index out of range: %d", i)
+        }</span>
+
+        <span class="cov0" title="0">if s.IsNull(i) </span><span class="cov0" title="0">{
+                return false, fmt.Errorf("null value at index %d", i)
+        }</span>
+
+        <span class="cov0" title="0">if arr, ok := s.array.(*array.Boolean); ok </span><span class="cov0" title="0">{
+                return arr.Value(i), nil
+        }</span>
+
+        <span class="cov0" title="0">return false, fmt.Errorf("cannot convert %s to bool", s.DataType())</span>
+}
+
+// Equal compares two Series for equality.
+// Returns true if they have the same type, length, and data.
+func (s *Series) Equal(other *Series) bool <span class="cov0" title="0">{
+        if s == other </span><span class="cov0" title="0">{
+                return true
+        }</span>
+
+        <span class="cov0" title="0">if other == nil </span><span class="cov0" title="0">{
+                return false
+        }</span>
+
+        // Check field equality (name and type)
+        <span class="cov0" title="0">if !s.field.Equal(other.field) </span><span class="cov0" title="0">{
+                return false
+        }</span>
+
+        // Use Arrow's built-in array equality
+        <span class="cov0" title="0">return array.Equal(s.array, other.array)</span>
+}
+
+// Validate checks the Series for consistency and data integrity.
+func (s *Series) Validate() error <span class="cov8" title="1">{
+        if s.array == nil </span><span class="cov0" title="0">{
+                return fmt.Errorf("Series has no underlying array")
+        }</span>
+
+        // Validate that the field type matches the array type
+        <span class="cov8" title="1">if !arrow.TypeEqual(s.field.Type, s.array.DataType()) </span><span class="cov0" title="0">{
+                return fmt.Errorf("field type %s does not match array type %s",
+                        s.field.Type, s.array.DataType())
+        }</span>
+
+        <span class="cov8" title="1">return nil</span>
+}
+
+// String returns a string representation of the Series.
+// This is primarily for debugging and should not be used for large Series.
+func (s *Series) String() string <span class="cov8" title="1">{
+        if s.array == nil </span><span class="cov0" title="0">{
+                return fmt.Sprintf("Series{%s: &lt;empty&gt;}", s.Name())
+        }</span>
+
+        <span class="cov8" title="1">return fmt.Sprintf("Series{%s: %s, len: %d, nulls: %d}",
+                s.Name(), s.DataType(), s.Len(), s.Null())</span>
+}
+
+// Clone creates a shallow copy of the Series.
+// The underlying Arrow data is shared (copy-on-write semantics).
+func (s *Series) Clone() *Series <span class="cov0" title="0">{
+        s.array.Retain() // Increment reference count
+        return &amp;Series{
+                array: s.array,
+                field: s.field,
+        }
+}</span>
+
+// Slice returns a new Series containing a subset of the data.
+// The underlying Arrow data is shared when possible.
+func (s *Series) Slice(offset, length int64) (*Series, error) <span class="cov8" title="1">{
+        if offset &lt; 0 || length &lt; 0 </span><span class="cov0" title="0">{
+                return nil, fmt.Errorf("offset and length must be non-negative")
+        }</span>
+
+        <span class="cov8" title="1">if offset+length &gt; int64(s.Len()) </span><span class="cov0" title="0">{
+                return nil, fmt.Errorf("slice bounds out of range")
+        }</span>
+
+        <span class="cov8" title="1">sliced := array.NewSlice(s.array, offset, offset+length)
+        return NewSeries(sliced, s.field), nil</span>
+}
+
+// Head returns the first n elements as a new Series.
+func (s *Series) Head(n int) (*Series, error) <span class="cov8" title="1">{
+        if n &lt; 0 </span><span class="cov0" title="0">{
+                return nil, fmt.Errorf("n must be non-negative")
+        }</span>
+
+        <span class="cov8" title="1">if n == 0 </span><span class="cov0" title="0">{
+                return s.Slice(0, 0)
+        }</span>
+
+        <span class="cov8" title="1">length := int64(n)
+        if length &gt; int64(s.Len()) </span><span class="cov0" title="0">{
+                length = int64(s.Len())
+        }</span>
+
+        <span class="cov8" title="1">return s.Slice(0, length)</span>
+}
+
+// Tail returns the last n elements as a new Series.
+func (s *Series) Tail(n int) (*Series, error) <span class="cov8" title="1">{
+        if n &lt; 0 </span><span class="cov0" title="0">{
+                return nil, fmt.Errorf("n must be non-negative")
+        }</span>
+
+        <span class="cov8" title="1">if n == 0 </span><span class="cov0" title="0">{
+                return s.Slice(int64(s.Len()), 0)
+        }</span>
+
+        <span class="cov8" title="1">length := int64(n)
+        offset := int64(s.Len()) - length
+
+        if offset &lt; 0 </span><span class="cov0" title="0">{
+                offset = 0
+                length = int64(s.Len())
+        }</span>
+
+        <span class="cov8" title="1">return s.Slice(offset, length)</span>
+}
+
+// Release decrements the reference count of the underlying Arrow Array.
+// The Series should not be used after calling Release().
+func (s *Series) Release() <span class="cov8" title="1">{
+        if s.array != nil </span><span class="cov8" title="1">{
+                s.array.Release()
+                s.array = nil
+        }</span>
+}
+</pre>
+		
+		</div>
+	</body>
+	<script>
+	(function() {
+		var files = document.getElementById('files');
+		var visible;
+		files.addEventListener('change', onChange, false);
+		function select(part) {
+			if (visible)
+				visible.style.display = 'none';
+			visible = document.getElementById(part);
+			if (!visible)
+				return;
+			files.value = part;
+			visible.style.display = 'block';
+			location.hash = part;
+		}
+		function onChange() {
+			select(files.value);
+			window.scrollTo(0, 0);
+		}
+		if (location.hash != "") {
+			select(location.hash.substr(1));
+		}
+		if (!visible) {
+			select("file0");
+		}
+	})();
+	</script>
+</html>
