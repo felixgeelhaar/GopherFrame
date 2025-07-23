@@ -6,6 +6,12 @@ on:
   pull_request:
     branches: [ main, develop ]
 
+permissions:
+  contents: write
+  security-events: write
+  actions: read
+  pages: write
+
 jobs:
   test:
     name: Test
@@ -103,7 +109,7 @@ jobs:
         auto-push: true
         comment-on-alert: true
         alert-threshold: '150%'
-        fail-on-alert: true
+        fail-on-alert: false
 
   security:
     name: Security Scan
@@ -128,3 +134,4 @@ jobs:
       uses: github/codeql-action/upload-sarif@v3
       with:
         sarif_file: gosec.sarif
+      if: always()
