@@ -6,6 +6,7 @@ package expr
 import (
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/apache/arrow-go/v18/arrow"
 	"github.com/apache/arrow-go/v18/arrow/array"
@@ -37,6 +38,16 @@ type Expr interface {
 	Contains(substring Expr) Expr
 	StartsWith(prefix Expr) Expr
 	EndsWith(suffix Expr) Expr
+
+	// Date/time manipulation methods
+	AddDays(days Expr) Expr
+	AddMonths(months Expr) Expr
+	AddYears(years Expr) Expr
+	Year() Expr
+	Month() Expr
+	Day() Expr
+	DayOfWeek() Expr
+	DateTrunc(unit string) Expr
 }
 
 // ColumnExpr represents a reference to an existing column.
@@ -125,6 +136,39 @@ func (c *ColumnExpr) StartsWith(prefix Expr) Expr {
 // EndsWith creates a binary expression that tests if this string column ends with a suffix.
 func (c *ColumnExpr) EndsWith(suffix Expr) Expr {
 	return NewBinaryExpr(c, suffix, "ends_with")
+}
+
+// Date/time methods for ColumnExpr
+func (c *ColumnExpr) AddDays(days Expr) Expr {
+	return NewBinaryExpr(c, days, "add_days")
+}
+
+func (c *ColumnExpr) AddMonths(months Expr) Expr {
+	return NewBinaryExpr(c, months, "add_months")
+}
+
+func (c *ColumnExpr) AddYears(years Expr) Expr {
+	return NewBinaryExpr(c, years, "add_years")
+}
+
+func (c *ColumnExpr) Year() Expr {
+	return NewUnaryExpr(c, "year")
+}
+
+func (c *ColumnExpr) Month() Expr {
+	return NewUnaryExpr(c, "month")
+}
+
+func (c *ColumnExpr) Day() Expr {
+	return NewUnaryExpr(c, "day")
+}
+
+func (c *ColumnExpr) DayOfWeek() Expr {
+	return NewUnaryExpr(c, "day_of_week")
+}
+
+func (c *ColumnExpr) DateTrunc(unit string) Expr {
+	return NewUnaryExpr(c, "date_trunc_"+unit)
 }
 
 // LiteralExpr represents a literal value.
@@ -277,7 +321,167 @@ func (l *LiteralExpr) EndsWith(suffix Expr) Expr {
 	return NewBinaryExpr(l, suffix, "ends_with")
 }
 
+// Date/time methods for LiteralExpr
+func (l *LiteralExpr) AddDays(days Expr) Expr {
+	return NewBinaryExpr(l, days, "add_days")
+}
+
+func (l *LiteralExpr) AddMonths(months Expr) Expr {
+	return NewBinaryExpr(l, months, "add_months")
+}
+
+func (l *LiteralExpr) AddYears(years Expr) Expr {
+	return NewBinaryExpr(l, years, "add_years")
+}
+
+func (l *LiteralExpr) Year() Expr {
+	return NewUnaryExpr(l, "year")
+}
+
+func (l *LiteralExpr) Month() Expr {
+	return NewUnaryExpr(l, "month")
+}
+
+func (l *LiteralExpr) Day() Expr {
+	return NewUnaryExpr(l, "day")
+}
+
+func (l *LiteralExpr) DayOfWeek() Expr {
+	return NewUnaryExpr(l, "day_of_week")
+}
+
+func (l *LiteralExpr) DateTrunc(unit string) Expr {
+	return NewUnaryExpr(l, "date_trunc_"+unit)
+}
+
 // BinaryExpr represents binary operations between two expressions.
+// UnaryExpr represents unary operations on a single expression.
+type UnaryExpr struct {
+	operand  Expr
+	operator string
+}
+
+// NewUnaryExpr creates a new unary expression.
+func NewUnaryExpr(operand Expr, operator string) Expr {
+	return &UnaryExpr{
+		operand:  operand,
+		operator: operator,
+	}
+}
+
+// Evaluate implements Expr.Evaluate for unary operations.
+func (u *UnaryExpr) Evaluate(df *core.DataFrame) (arrow.Array, error) {
+	// Evaluate the operand
+	operandArray, err := u.operand.Evaluate(df)
+	if err != nil {
+		return nil, fmt.Errorf("failed to evaluate operand: %w", err)
+	}
+	defer operandArray.Release()
+
+	// Implement unary operations
+	switch u.operator {
+	case "year":
+		return u.evaluateYear(operandArray)
+	case "month":
+		return u.evaluateMonth(operandArray)
+	case "day":
+		return u.evaluateDay(operandArray)
+	case "day_of_week":
+		return u.evaluateDayOfWeek(operandArray)
+	default:
+		if strings.HasPrefix(u.operator, "date_trunc_") {
+			unit := strings.TrimPrefix(u.operator, "date_trunc_")
+			return u.evaluateDateTrunc(operandArray, unit)
+		}
+		return nil, fmt.Errorf("unsupported unary operator: %s", u.operator)
+	}
+}
+
+// Name implements Expr.Name for unary expressions.
+func (u *UnaryExpr) Name() string {
+	return fmt.Sprintf("%s(%s)", u.operator, u.operand.Name())
+}
+
+// String implements Expr.String for unary expressions.
+func (u *UnaryExpr) String() string {
+	return fmt.Sprintf("%s(%s)", u.operator, u.operand.String())
+}
+
+// Implement all binary operation methods for UnaryExpr
+func (u *UnaryExpr) Add(other Expr) Expr {
+	return NewBinaryExpr(u, other, "add")
+}
+
+func (u *UnaryExpr) Sub(other Expr) Expr {
+	return NewBinaryExpr(u, other, "subtract")
+}
+
+func (u *UnaryExpr) Mul(other Expr) Expr {
+	return NewBinaryExpr(u, other, "multiply")
+}
+
+func (u *UnaryExpr) Div(other Expr) Expr {
+	return NewBinaryExpr(u, other, "divide")
+}
+
+func (u *UnaryExpr) Gt(other Expr) Expr {
+	return NewBinaryExpr(u, other, "greater")
+}
+
+func (u *UnaryExpr) Lt(other Expr) Expr {
+	return NewBinaryExpr(u, other, "less")
+}
+
+func (u *UnaryExpr) Eq(other Expr) Expr {
+	return NewBinaryExpr(u, other, "equal")
+}
+
+// String manipulation methods for UnaryExpr
+func (u *UnaryExpr) Contains(substring Expr) Expr {
+	return NewBinaryExpr(u, substring, "contains")
+}
+
+func (u *UnaryExpr) StartsWith(prefix Expr) Expr {
+	return NewBinaryExpr(u, prefix, "starts_with")
+}
+
+func (u *UnaryExpr) EndsWith(suffix Expr) Expr {
+	return NewBinaryExpr(u, suffix, "ends_with")
+}
+
+// Date/time methods for UnaryExpr
+func (u *UnaryExpr) AddDays(days Expr) Expr {
+	return NewBinaryExpr(u, days, "add_days")
+}
+
+func (u *UnaryExpr) AddMonths(months Expr) Expr {
+	return NewBinaryExpr(u, months, "add_months")
+}
+
+func (u *UnaryExpr) AddYears(years Expr) Expr {
+	return NewBinaryExpr(u, years, "add_years")
+}
+
+func (u *UnaryExpr) Year() Expr {
+	return NewUnaryExpr(u, "year")
+}
+
+func (u *UnaryExpr) Month() Expr {
+	return NewUnaryExpr(u, "month")
+}
+
+func (u *UnaryExpr) Day() Expr {
+	return NewUnaryExpr(u, "day")
+}
+
+func (u *UnaryExpr) DayOfWeek() Expr {
+	return NewUnaryExpr(u, "day_of_week")
+}
+
+func (u *UnaryExpr) DateTrunc(unit string) Expr {
+	return NewUnaryExpr(u, "date_trunc_"+unit)
+}
+
 type BinaryExpr struct {
 	left     Expr
 	right    Expr
@@ -330,6 +534,12 @@ func (b *BinaryExpr) Evaluate(df *core.DataFrame) (arrow.Array, error) {
 		return b.evaluateStartsWith(leftArray, rightArray)
 	case "ends_with":
 		return b.evaluateEndsWith(leftArray, rightArray)
+	case "add_days":
+		return b.evaluateAddDays(leftArray, rightArray)
+	case "add_months":
+		return b.evaluateAddMonths(leftArray, rightArray)
+	case "add_years":
+		return b.evaluateAddYears(leftArray, rightArray)
 	default:
 		return nil, fmt.Errorf("unsupported binary operator: %s", b.operator)
 	}
@@ -724,6 +934,39 @@ func (b *BinaryExpr) EndsWith(suffix Expr) Expr {
 	return NewBinaryExpr(b, suffix, "ends_with")
 }
 
+// Date/time methods for BinaryExpr
+func (b *BinaryExpr) AddDays(days Expr) Expr {
+	return NewBinaryExpr(b, days, "add_days")
+}
+
+func (b *BinaryExpr) AddMonths(months Expr) Expr {
+	return NewBinaryExpr(b, months, "add_months")
+}
+
+func (b *BinaryExpr) AddYears(years Expr) Expr {
+	return NewBinaryExpr(b, years, "add_years")
+}
+
+func (b *BinaryExpr) Year() Expr {
+	return NewUnaryExpr(b, "year")
+}
+
+func (b *BinaryExpr) Month() Expr {
+	return NewUnaryExpr(b, "month")
+}
+
+func (b *BinaryExpr) Day() Expr {
+	return NewUnaryExpr(b, "day")
+}
+
+func (b *BinaryExpr) DayOfWeek() Expr {
+	return NewUnaryExpr(b, "day_of_week")
+}
+
+func (b *BinaryExpr) DateTrunc(unit string) Expr {
+	return NewUnaryExpr(b, "date_trunc_"+unit)
+}
+
 // evaluateContains implements string contains comparison
 func (b *BinaryExpr) evaluateContains(left, right arrow.Array) (arrow.Array, error) {
 	if left.Len() != right.Len() {
@@ -884,8 +1127,510 @@ func inferDataType(value interface{}) arrow.DataType {
 		return arrow.PrimitiveTypes.Float64
 	case string:
 		return arrow.BinaryTypes.String
+	case time.Time:
+		return arrow.FixedWidthTypes.Timestamp_us
 	default:
 		// Default to string for unknown types
 		return arrow.BinaryTypes.String
+	}
+}
+
+// Date/time evaluation functions for UnaryExpr
+func (u *UnaryExpr) evaluateYear(operand arrow.Array) (arrow.Array, error) {
+	pool := memory.NewGoAllocator()
+	builder := array.NewInt32Builder(pool)
+	defer builder.Release()
+
+	switch operand.DataType().ID() {
+	case arrow.DATE32:
+		dateArray := operand.(*array.Date32)
+		for i := 0; i < operand.Len(); i++ {
+			if dateArray.IsNull(i) {
+				builder.AppendNull()
+			} else {
+				// Date32 is days since Unix epoch
+				days := dateArray.Value(i)
+				t := time.Unix(int64(days)*86400, 0).UTC()
+				builder.Append(int32(t.Year()))
+			}
+		}
+	case arrow.DATE64:
+		dateArray := operand.(*array.Date64)
+		for i := 0; i < operand.Len(); i++ {
+			if dateArray.IsNull(i) {
+				builder.AppendNull()
+			} else {
+				// Date64 is milliseconds since Unix epoch
+				ms := int64(dateArray.Value(i))
+				t := time.Unix(ms/1000, (ms%1000)*1000000).UTC()
+				builder.Append(int32(t.Year()))
+			}
+		}
+	case arrow.TIMESTAMP:
+		timestampArray := operand.(*array.Timestamp)
+		for i := 0; i < operand.Len(); i++ {
+			if timestampArray.IsNull(i) {
+				builder.AppendNull()
+			} else {
+				ts := int64(timestampArray.Value(i))
+				t := time.Unix(ts/1000000, (ts%1000000)*1000).UTC()
+				builder.Append(int32(t.Year()))
+			}
+		}
+	default:
+		return nil, fmt.Errorf("unsupported type for year extraction: %s", operand.DataType())
+	}
+
+	return builder.NewArray(), nil
+}
+
+func (u *UnaryExpr) evaluateMonth(operand arrow.Array) (arrow.Array, error) {
+	pool := memory.NewGoAllocator()
+	builder := array.NewInt32Builder(pool)
+	defer builder.Release()
+
+	switch operand.DataType().ID() {
+	case arrow.DATE32:
+		dateArray := operand.(*array.Date32)
+		for i := 0; i < operand.Len(); i++ {
+			if dateArray.IsNull(i) {
+				builder.AppendNull()
+			} else {
+				days := dateArray.Value(i)
+				t := time.Unix(int64(days)*86400, 0).UTC()
+				builder.Append(int32(t.Month()))
+			}
+		}
+	case arrow.DATE64:
+		dateArray := operand.(*array.Date64)
+		for i := 0; i < operand.Len(); i++ {
+			if dateArray.IsNull(i) {
+				builder.AppendNull()
+			} else {
+				ms := int64(dateArray.Value(i))
+				t := time.Unix(ms/1000, (ms%1000)*1000000).UTC()
+				builder.Append(int32(t.Month()))
+			}
+		}
+	case arrow.TIMESTAMP:
+		timestampArray := operand.(*array.Timestamp)
+		for i := 0; i < operand.Len(); i++ {
+			if timestampArray.IsNull(i) {
+				builder.AppendNull()
+			} else {
+				ts := int64(timestampArray.Value(i))
+				t := time.Unix(ts/1000000, (ts%1000000)*1000).UTC()
+				builder.Append(int32(t.Month()))
+			}
+		}
+	default:
+		return nil, fmt.Errorf("unsupported type for month extraction: %s", operand.DataType())
+	}
+
+	return builder.NewArray(), nil
+}
+
+func (u *UnaryExpr) evaluateDay(operand arrow.Array) (arrow.Array, error) {
+	pool := memory.NewGoAllocator()
+	builder := array.NewInt32Builder(pool)
+	defer builder.Release()
+
+	switch operand.DataType().ID() {
+	case arrow.DATE32:
+		dateArray := operand.(*array.Date32)
+		for i := 0; i < operand.Len(); i++ {
+			if dateArray.IsNull(i) {
+				builder.AppendNull()
+			} else {
+				days := dateArray.Value(i)
+				t := time.Unix(int64(days)*86400, 0).UTC()
+				builder.Append(int32(t.Day()))
+			}
+		}
+	case arrow.DATE64:
+		dateArray := operand.(*array.Date64)
+		for i := 0; i < operand.Len(); i++ {
+			if dateArray.IsNull(i) {
+				builder.AppendNull()
+			} else {
+				ms := int64(dateArray.Value(i))
+				t := time.Unix(ms/1000, (ms%1000)*1000000).UTC()
+				builder.Append(int32(t.Day()))
+			}
+		}
+	case arrow.TIMESTAMP:
+		timestampArray := operand.(*array.Timestamp)
+		for i := 0; i < operand.Len(); i++ {
+			if timestampArray.IsNull(i) {
+				builder.AppendNull()
+			} else {
+				ts := int64(timestampArray.Value(i))
+				t := time.Unix(ts/1000000, (ts%1000000)*1000).UTC()
+				builder.Append(int32(t.Day()))
+			}
+		}
+	default:
+		return nil, fmt.Errorf("unsupported type for day extraction: %s", operand.DataType())
+	}
+
+	return builder.NewArray(), nil
+}
+
+func (u *UnaryExpr) evaluateDayOfWeek(operand arrow.Array) (arrow.Array, error) {
+	pool := memory.NewGoAllocator()
+	builder := array.NewInt32Builder(pool)
+	defer builder.Release()
+
+	switch operand.DataType().ID() {
+	case arrow.DATE32:
+		dateArray := operand.(*array.Date32)
+		for i := 0; i < operand.Len(); i++ {
+			if dateArray.IsNull(i) {
+				builder.AppendNull()
+			} else {
+				days := dateArray.Value(i)
+				t := time.Unix(int64(days)*86400, 0).UTC()
+				// Convert Go's Sunday=0 to ISO's Monday=1
+				weekday := int32(t.Weekday())
+				if weekday == 0 {
+					weekday = 7
+				}
+				builder.Append(weekday)
+			}
+		}
+	case arrow.DATE64:
+		dateArray := operand.(*array.Date64)
+		for i := 0; i < operand.Len(); i++ {
+			if dateArray.IsNull(i) {
+				builder.AppendNull()
+			} else {
+				ms := int64(dateArray.Value(i))
+				t := time.Unix(ms/1000, (ms%1000)*1000000).UTC()
+				weekday := int32(t.Weekday())
+				if weekday == 0 {
+					weekday = 7
+				}
+				builder.Append(weekday)
+			}
+		}
+	case arrow.TIMESTAMP:
+		timestampArray := operand.(*array.Timestamp)
+		for i := 0; i < operand.Len(); i++ {
+			if timestampArray.IsNull(i) {
+				builder.AppendNull()
+			} else {
+				ts := int64(timestampArray.Value(i))
+				t := time.Unix(ts/1000000, (ts%1000000)*1000).UTC()
+				weekday := int32(t.Weekday())
+				if weekday == 0 {
+					weekday = 7
+				}
+				builder.Append(weekday)
+			}
+		}
+	default:
+		return nil, fmt.Errorf("unsupported type for day_of_week extraction: %s", operand.DataType())
+	}
+
+	return builder.NewArray(), nil
+}
+
+func (u *UnaryExpr) evaluateDateTrunc(operand arrow.Array, unit string) (arrow.Array, error) {
+	pool := memory.NewGoAllocator()
+
+	switch operand.DataType().ID() {
+	case arrow.DATE32:
+		builder := array.NewDate32Builder(pool)
+		defer builder.Release()
+
+		dateArray := operand.(*array.Date32)
+		for i := 0; i < operand.Len(); i++ {
+			if dateArray.IsNull(i) {
+				builder.AppendNull()
+			} else {
+				days := dateArray.Value(i)
+				t := time.Unix(int64(days)*86400, 0).UTC()
+				truncated := truncateDate(t, unit)
+				truncatedDays := int32(truncated.Unix() / 86400)
+				builder.Append(arrow.Date32(truncatedDays))
+			}
+		}
+		return builder.NewArray(), nil
+
+	case arrow.DATE64:
+		builder := array.NewDate64Builder(pool)
+		defer builder.Release()
+
+		dateArray := operand.(*array.Date64)
+		for i := 0; i < operand.Len(); i++ {
+			if dateArray.IsNull(i) {
+				builder.AppendNull()
+			} else {
+				ms := int64(dateArray.Value(i))
+				t := time.Unix(ms/1000, (ms%1000)*1000000).UTC()
+				truncated := truncateDate(t, unit)
+				truncatedMs := truncated.Unix() * 1000
+				builder.Append(arrow.Date64(truncatedMs))
+			}
+		}
+		return builder.NewArray(), nil
+
+	case arrow.TIMESTAMP:
+		builder := array.NewTimestampBuilder(pool, operand.DataType().(*arrow.TimestampType))
+		defer builder.Release()
+
+		timestampArray := operand.(*array.Timestamp)
+		for i := 0; i < operand.Len(); i++ {
+			if timestampArray.IsNull(i) {
+				builder.AppendNull()
+			} else {
+				ts := int64(timestampArray.Value(i))
+				t := time.Unix(ts/1000000, (ts%1000000)*1000).UTC()
+				truncated := truncateDate(t, unit)
+				truncatedTs := truncated.Unix() * 1000000
+				builder.Append(arrow.Timestamp(truncatedTs))
+			}
+		}
+		return builder.NewArray(), nil
+
+	default:
+		return nil, fmt.Errorf("unsupported type for date truncation: %s", operand.DataType())
+	}
+}
+
+// Binary date operations
+func (b *BinaryExpr) evaluateAddDays(left, right arrow.Array) (arrow.Array, error) {
+	if left.Len() != right.Len() {
+		return nil, fmt.Errorf("array length mismatch: %d vs %d", left.Len(), right.Len())
+	}
+
+	pool := memory.NewGoAllocator()
+
+	// Right operand should be Int32 or Int64 (number of days)
+	if right.DataType().ID() != arrow.INT32 && right.DataType().ID() != arrow.INT64 {
+		return nil, fmt.Errorf("AddDays requires integer days parameter, got %s", right.DataType())
+	}
+
+	switch left.DataType().ID() {
+	case arrow.DATE32:
+		builder := array.NewDate32Builder(pool)
+		defer builder.Release()
+
+		dateArray := left.(*array.Date32)
+		var daysArray arrow.Array
+		if right.DataType().ID() == arrow.INT32 {
+			daysArray = right
+		} else {
+			// Convert Int64 to Int32
+			int64Array := right.(*array.Int64)
+			int32Builder := array.NewInt32Builder(pool)
+			defer int32Builder.Release()
+			for i := 0; i < right.Len(); i++ {
+				if int64Array.IsNull(i) {
+					int32Builder.AppendNull()
+				} else {
+					int32Builder.Append(int32(int64Array.Value(i)))
+				}
+			}
+			daysArray = int32Builder.NewArray()
+			defer daysArray.Release()
+		}
+
+		daysInt32 := daysArray.(*array.Int32)
+		for i := 0; i < left.Len(); i++ {
+			if dateArray.IsNull(i) || daysInt32.IsNull(i) {
+				builder.AppendNull()
+			} else {
+				originalDays := dateArray.Value(i)
+				addDays := daysInt32.Value(i)
+				builder.Append(arrow.Date32(int32(originalDays) + addDays))
+			}
+		}
+		return builder.NewArray(), nil
+
+	case arrow.DATE64:
+		builder := array.NewDate64Builder(pool)
+		defer builder.Release()
+
+		dateArray := left.(*array.Date64)
+		for i := 0; i < left.Len(); i++ {
+			if dateArray.IsNull(i) || right.IsNull(i) {
+				builder.AppendNull()
+			} else {
+				originalMs := dateArray.Value(i)
+				var addDays int64
+				if right.DataType().ID() == arrow.INT32 {
+					addDays = int64(right.(*array.Int32).Value(i))
+				} else {
+					addDays = right.(*array.Int64).Value(i)
+				}
+				newMs := int64(originalMs) + (addDays * 86400 * 1000) // days to milliseconds
+				builder.Append(arrow.Date64(newMs))
+			}
+		}
+		return builder.NewArray(), nil
+
+	default:
+		return nil, fmt.Errorf("unsupported type for AddDays: %s", left.DataType())
+	}
+}
+
+func (b *BinaryExpr) evaluateAddMonths(left, right arrow.Array) (arrow.Array, error) {
+	if left.Len() != right.Len() {
+		return nil, fmt.Errorf("array length mismatch: %d vs %d", left.Len(), right.Len())
+	}
+
+	pool := memory.NewGoAllocator()
+
+	// Right operand should be Int32 or Int64 (number of months)
+	if right.DataType().ID() != arrow.INT32 && right.DataType().ID() != arrow.INT64 {
+		return nil, fmt.Errorf("AddMonths requires integer months parameter, got %s", right.DataType())
+	}
+
+	switch left.DataType().ID() {
+	case arrow.DATE32:
+		builder := array.NewDate32Builder(pool)
+		defer builder.Release()
+
+		dateArray := left.(*array.Date32)
+		for i := 0; i < left.Len(); i++ {
+			if dateArray.IsNull(i) || right.IsNull(i) {
+				builder.AppendNull()
+			} else {
+				days := dateArray.Value(i)
+				t := time.Unix(int64(days)*86400, 0).UTC()
+
+				var addMonths int
+				if right.DataType().ID() == arrow.INT32 {
+					addMonths = int(right.(*array.Int32).Value(i))
+				} else {
+					addMonths = int(right.(*array.Int64).Value(i))
+				}
+
+				newTime := t.AddDate(0, addMonths, 0)
+				newDays := int32(newTime.Unix() / 86400)
+				builder.Append(arrow.Date32(newDays))
+			}
+		}
+		return builder.NewArray(), nil
+
+	case arrow.DATE64:
+		builder := array.NewDate64Builder(pool)
+		defer builder.Release()
+
+		dateArray := left.(*array.Date64)
+		for i := 0; i < left.Len(); i++ {
+			if dateArray.IsNull(i) || right.IsNull(i) {
+				builder.AppendNull()
+			} else {
+				ms := int64(dateArray.Value(i))
+				t := time.Unix(ms/1000, (ms%1000)*1000000).UTC()
+
+				var addMonths int
+				if right.DataType().ID() == arrow.INT32 {
+					addMonths = int(right.(*array.Int32).Value(i))
+				} else {
+					addMonths = int(right.(*array.Int64).Value(i))
+				}
+
+				newTime := t.AddDate(0, addMonths, 0)
+				newMs := newTime.Unix() * 1000
+				builder.Append(arrow.Date64(newMs))
+			}
+		}
+		return builder.NewArray(), nil
+
+	default:
+		return nil, fmt.Errorf("unsupported type for AddMonths: %s", left.DataType())
+	}
+}
+
+func (b *BinaryExpr) evaluateAddYears(left, right arrow.Array) (arrow.Array, error) {
+	if left.Len() != right.Len() {
+		return nil, fmt.Errorf("array length mismatch: %d vs %d", left.Len(), right.Len())
+	}
+
+	pool := memory.NewGoAllocator()
+
+	// Right operand should be Int32 or Int64 (number of years)
+	if right.DataType().ID() != arrow.INT32 && right.DataType().ID() != arrow.INT64 {
+		return nil, fmt.Errorf("AddYears requires integer years parameter, got %s", right.DataType())
+	}
+
+	switch left.DataType().ID() {
+	case arrow.DATE32:
+		builder := array.NewDate32Builder(pool)
+		defer builder.Release()
+
+		dateArray := left.(*array.Date32)
+		for i := 0; i < left.Len(); i++ {
+			if dateArray.IsNull(i) || right.IsNull(i) {
+				builder.AppendNull()
+			} else {
+				days := dateArray.Value(i)
+				t := time.Unix(int64(days)*86400, 0).UTC()
+
+				var addYears int
+				if right.DataType().ID() == arrow.INT32 {
+					addYears = int(right.(*array.Int32).Value(i))
+				} else {
+					addYears = int(right.(*array.Int64).Value(i))
+				}
+
+				newTime := t.AddDate(addYears, 0, 0)
+				newDays := int32(newTime.Unix() / 86400)
+				builder.Append(arrow.Date32(newDays))
+			}
+		}
+		return builder.NewArray(), nil
+
+	case arrow.DATE64:
+		builder := array.NewDate64Builder(pool)
+		defer builder.Release()
+
+		dateArray := left.(*array.Date64)
+		for i := 0; i < left.Len(); i++ {
+			if dateArray.IsNull(i) || right.IsNull(i) {
+				builder.AppendNull()
+			} else {
+				ms := int64(dateArray.Value(i))
+				t := time.Unix(ms/1000, (ms%1000)*1000000).UTC()
+
+				var addYears int
+				if right.DataType().ID() == arrow.INT32 {
+					addYears = int(right.(*array.Int32).Value(i))
+				} else {
+					addYears = int(right.(*array.Int64).Value(i))
+				}
+
+				newTime := t.AddDate(addYears, 0, 0)
+				newMs := newTime.Unix() * 1000
+				builder.Append(arrow.Date64(newMs))
+			}
+		}
+		return builder.NewArray(), nil
+
+	default:
+		return nil, fmt.Errorf("unsupported type for AddYears: %s", left.DataType())
+	}
+}
+
+// Helper function to truncate date based on unit
+func truncateDate(t time.Time, unit string) time.Time {
+	switch unit {
+	case "year":
+		return time.Date(t.Year(), 1, 1, 0, 0, 0, 0, t.Location())
+	case "month":
+		return time.Date(t.Year(), t.Month(), 1, 0, 0, 0, 0, t.Location())
+	case "day":
+		return time.Date(t.Year(), t.Month(), t.Day(), 0, 0, 0, 0, t.Location())
+	case "hour":
+		return time.Date(t.Year(), t.Month(), t.Day(), t.Hour(), 0, 0, 0, t.Location())
+	case "minute":
+		return time.Date(t.Year(), t.Month(), t.Day(), t.Hour(), t.Minute(), 0, 0, t.Location())
+	case "second":
+		return time.Date(t.Year(), t.Month(), t.Day(), t.Hour(), t.Minute(), t.Second(), 0, t.Location())
+	default:
+		return t // Return original if unknown unit
 	}
 }
