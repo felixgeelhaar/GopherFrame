@@ -422,6 +422,10 @@ func (df *DataFrame) Filter(predicateArray arrow.Array) (*DataFrame, error) {
 				builder := array.NewStringBuilder(pool)
 				emptyColumns[i] = builder.NewArray()
 				builder.Release()
+			case arrow.BOOL:
+				builder := array.NewBooleanBuilder(pool)
+				emptyColumns[i] = builder.NewArray()
+				builder.Release()
 			default:
 				return nil, fmt.Errorf("unsupported data type for empty filter: %s", field.Type)
 			}
@@ -484,6 +488,25 @@ func (df *DataFrame) Filter(predicateArray arrow.Array) (*DataFrame, error) {
 				return nil, fmt.Errorf("expected String array for column %d", colIdx)
 			}
 			builder := array.NewStringBuilder(pool)
+
+			for i := 0; i < boolArray.Len(); i++ {
+				if !boolArray.IsNull(i) && boolArray.Value(i) {
+					if srcArray.IsNull(i) {
+						builder.AppendNull()
+					} else {
+						builder.Append(srcArray.Value(i))
+					}
+				}
+			}
+			filteredColumns[colIdx] = builder.NewArray()
+			builder.Release()
+
+		case arrow.BOOL:
+			srcArray, ok := column.(*array.Boolean)
+			if !ok {
+				return nil, fmt.Errorf("expected Boolean array for column %d", colIdx)
+			}
+			builder := array.NewBooleanBuilder(pool)
 
 			for i := 0; i < boolArray.Len(); i++ {
 				if !boolArray.IsNull(i) && boolArray.Value(i) {
