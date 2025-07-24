@@ -19,6 +19,9 @@ type Expr interface {
 	// Evaluate executes the expression against a DataFrame and returns the result.
 	Evaluate(df *core.DataFrame) (arrow.Array, error)
 
+	// EvaluateWithPool executes the expression using a specific memory pool.
+	EvaluateWithPool(df *core.DataFrame, pool memory.Allocator) (arrow.Array, error)
+
 	// Name returns the output name of this expression.
 	Name() string
 
@@ -76,6 +79,12 @@ func (c *ColumnExpr) Evaluate(df *core.DataFrame) (arrow.Array, error) {
 	arr := series.Array()
 	arr.Retain()
 	return arr, nil
+}
+
+// EvaluateWithPool implements Expr.EvaluateWithPool for column references.
+func (c *ColumnExpr) EvaluateWithPool(df *core.DataFrame, pool memory.Allocator) (arrow.Array, error) {
+	// Column references don't need pooled allocation, just return the existing array
+	return c.Evaluate(df)
 }
 
 // Name implements Expr.Name for column references.
@@ -195,10 +204,14 @@ func Lit(value interface{}) Expr {
 
 // Evaluate implements Expr.Evaluate for literal values.
 func (l *LiteralExpr) Evaluate(df *core.DataFrame) (arrow.Array, error) {
-	numRows := int(df.NumRows())
-	pool := memory.NewGoAllocator()
+	return l.EvaluateWithPool(df, memory.NewGoAllocator())
+}
 
-	// Create an array filled with the literal value
+// EvaluateWithPool implements Expr.EvaluateWithPool for literal values.
+func (l *LiteralExpr) EvaluateWithPool(df *core.DataFrame, pool memory.Allocator) (arrow.Array, error) {
+	numRows := int(df.NumRows())
+
+	// Create an array filled with the literal value using the provided pool
 	switch l.dataType.ID() {
 	case arrow.INT64:
 		builder := array.NewInt64Builder(pool)
@@ -214,6 +227,7 @@ func (l *LiteralExpr) Evaluate(df *core.DataFrame) (arrow.Array, error) {
 			}
 		}
 
+		builder.Reserve(numRows)
 		for i := 0; i < numRows; i++ {
 			builder.Append(intVal)
 		}
@@ -228,6 +242,7 @@ func (l *LiteralExpr) Evaluate(df *core.DataFrame) (arrow.Array, error) {
 			return nil, fmt.Errorf("type mismatch: expected float64, got %T", l.value)
 		}
 
+		builder.Reserve(numRows)
 		for i := 0; i < numRows; i++ {
 			builder.Append(floatVal)
 		}
@@ -242,6 +257,7 @@ func (l *LiteralExpr) Evaluate(df *core.DataFrame) (arrow.Array, error) {
 			return nil, fmt.Errorf("type mismatch: expected string, got %T", l.value)
 		}
 
+		builder.Reserve(numRows)
 		for i := 0; i < numRows; i++ {
 			builder.Append(strVal)
 		}
@@ -256,6 +272,7 @@ func (l *LiteralExpr) Evaluate(df *core.DataFrame) (arrow.Array, error) {
 			return nil, fmt.Errorf("type mismatch: expected bool, got %T", l.value)
 		}
 
+		builder.Reserve(numRows)
 		for i := 0; i < numRows; i++ {
 			builder.Append(boolVal)
 		}
@@ -371,8 +388,13 @@ func NewUnaryExpr(operand Expr, operator string) Expr {
 
 // Evaluate implements Expr.Evaluate for unary operations.
 func (u *UnaryExpr) Evaluate(df *core.DataFrame) (arrow.Array, error) {
-	// Evaluate the operand
-	operandArray, err := u.operand.Evaluate(df)
+	return u.EvaluateWithPool(df, memory.NewGoAllocator())
+}
+
+// EvaluateWithPool implements Expr.EvaluateWithPool for unary operations.
+func (u *UnaryExpr) EvaluateWithPool(df *core.DataFrame, pool memory.Allocator) (arrow.Array, error) {
+	// Evaluate the operand with the same pool
+	operandArray, err := u.operand.EvaluateWithPool(df, pool)
 	if err != nil {
 		return nil, fmt.Errorf("failed to evaluate operand: %w", err)
 	}
@@ -499,14 +521,19 @@ func NewBinaryExpr(left, right Expr, operator string) Expr {
 
 // Evaluate implements Expr.Evaluate for binary operations.
 func (b *BinaryExpr) Evaluate(df *core.DataFrame) (arrow.Array, error) {
-	// Evaluate left and right operands
-	leftArray, err := b.left.Evaluate(df)
+	return b.EvaluateWithPool(df, memory.NewGoAllocator())
+}
+
+// EvaluateWithPool implements Expr.EvaluateWithPool for binary operations.
+func (b *BinaryExpr) EvaluateWithPool(df *core.DataFrame, pool memory.Allocator) (arrow.Array, error) {
+	// Evaluate left and right operands with the same pool
+	leftArray, err := b.left.EvaluateWithPool(df, pool)
 	if err != nil {
 		return nil, fmt.Errorf("failed to evaluate left operand: %w", err)
 	}
 	defer leftArray.Release()
 
-	rightArray, err := b.right.Evaluate(df)
+	rightArray, err := b.right.EvaluateWithPool(df, pool)
 	if err != nil {
 		return nil, fmt.Errorf("failed to evaluate right operand: %w", err)
 	}
