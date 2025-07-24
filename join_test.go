@@ -246,7 +246,18 @@ func TestJoin_DifferentDataTypes(t *testing.T) {
 	assert.Equal(t, int64(2), result.NumRows())
 
 	record := result.Record()
-	codes := record.Column(0).(*array.String)
+
+	// Find the code column index
+	codeIdx := -1
+	actualCols := result.ColumnNames()
+	for i, colName := range actualCols {
+		if colName == "code" {
+			codeIdx = i
+			break
+		}
+	}
+
+	codes := record.Column(codeIdx).(*array.String)
 	assert.Equal(t, "A", codes.Value(0))
 	assert.Equal(t, "B", codes.Value(1))
 }

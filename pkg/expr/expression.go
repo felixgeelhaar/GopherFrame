@@ -5,6 +5,7 @@ package expr
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/apache/arrow-go/v18/arrow"
 	"github.com/apache/arrow-go/v18/arrow/array"
@@ -31,6 +32,11 @@ type Expr interface {
 	Gt(other Expr) Expr
 	Lt(other Expr) Expr
 	Eq(other Expr) Expr
+
+	// String manipulation methods
+	Contains(substring Expr) Expr
+	StartsWith(prefix Expr) Expr
+	EndsWith(suffix Expr) Expr
 }
 
 // ColumnExpr represents a reference to an existing column.
@@ -104,6 +110,21 @@ func (c *ColumnExpr) Lt(other Expr) Expr {
 // Eq creates a binary expression that tests if this column is equal to another expression.
 func (c *ColumnExpr) Eq(other Expr) Expr {
 	return NewBinaryExpr(c, other, "equal")
+}
+
+// Contains creates a binary expression that tests if this string column contains a substring.
+func (c *ColumnExpr) Contains(substring Expr) Expr {
+	return NewBinaryExpr(c, substring, "contains")
+}
+
+// StartsWith creates a binary expression that tests if this string column starts with a prefix.
+func (c *ColumnExpr) StartsWith(prefix Expr) Expr {
+	return NewBinaryExpr(c, prefix, "starts_with")
+}
+
+// EndsWith creates a binary expression that tests if this string column ends with a suffix.
+func (c *ColumnExpr) EndsWith(suffix Expr) Expr {
+	return NewBinaryExpr(c, suffix, "ends_with")
 }
 
 // LiteralExpr represents a literal value.
@@ -243,6 +264,19 @@ func (l *LiteralExpr) Eq(other Expr) Expr {
 	return NewBinaryExpr(l, other, "equal")
 }
 
+// String manipulation methods for literals
+func (l *LiteralExpr) Contains(substring Expr) Expr {
+	return NewBinaryExpr(l, substring, "contains")
+}
+
+func (l *LiteralExpr) StartsWith(prefix Expr) Expr {
+	return NewBinaryExpr(l, prefix, "starts_with")
+}
+
+func (l *LiteralExpr) EndsWith(suffix Expr) Expr {
+	return NewBinaryExpr(l, suffix, "ends_with")
+}
+
 // BinaryExpr represents binary operations between two expressions.
 type BinaryExpr struct {
 	left     Expr
@@ -290,6 +324,12 @@ func (b *BinaryExpr) Evaluate(df *core.DataFrame) (arrow.Array, error) {
 		return b.evaluateMultiply(leftArray, rightArray)
 	case "divide":
 		return b.evaluateDivide(leftArray, rightArray)
+	case "contains":
+		return b.evaluateContains(leftArray, rightArray)
+	case "starts_with":
+		return b.evaluateStartsWith(leftArray, rightArray)
+	case "ends_with":
+		return b.evaluateEndsWith(leftArray, rightArray)
 	default:
 		return nil, fmt.Errorf("unsupported binary operator: %s", b.operator)
 	}
@@ -669,6 +709,136 @@ func (b *BinaryExpr) Lt(other Expr) Expr {
 
 func (b *BinaryExpr) Eq(other Expr) Expr {
 	return NewBinaryExpr(b, other, "equal")
+}
+
+// String manipulation methods for binary expressions
+func (b *BinaryExpr) Contains(substring Expr) Expr {
+	return NewBinaryExpr(b, substring, "contains")
+}
+
+func (b *BinaryExpr) StartsWith(prefix Expr) Expr {
+	return NewBinaryExpr(b, prefix, "starts_with")
+}
+
+func (b *BinaryExpr) EndsWith(suffix Expr) Expr {
+	return NewBinaryExpr(b, suffix, "ends_with")
+}
+
+// evaluateContains implements string contains comparison
+func (b *BinaryExpr) evaluateContains(left, right arrow.Array) (arrow.Array, error) {
+	if left.Len() != right.Len() {
+		return nil, fmt.Errorf("array length mismatch: %d vs %d", left.Len(), right.Len())
+	}
+
+	// Both operands must be strings
+	if left.DataType().ID() != arrow.STRING || right.DataType().ID() != arrow.STRING {
+		return nil, fmt.Errorf("contains operation requires string operands, got %s and %s", left.DataType(), right.DataType())
+	}
+
+	leftStr, ok := asStringArray(left)
+	if !ok {
+		return nil, fmt.Errorf("failed to cast left array to String")
+	}
+
+	rightStr, ok := asStringArray(right)
+	if !ok {
+		return nil, fmt.Errorf("failed to cast right array to String")
+	}
+
+	pool := memory.NewGoAllocator()
+	builder := array.NewBooleanBuilder(pool)
+	defer builder.Release()
+
+	for i := 0; i < left.Len(); i++ {
+		if leftStr.IsNull(i) || rightStr.IsNull(i) {
+			builder.AppendNull()
+		} else {
+			leftVal := leftStr.Value(i)
+			rightVal := rightStr.Value(i)
+			result := strings.Contains(leftVal, rightVal)
+			builder.Append(result)
+		}
+	}
+
+	return builder.NewArray(), nil
+}
+
+// evaluateStartsWith implements string starts_with comparison
+func (b *BinaryExpr) evaluateStartsWith(left, right arrow.Array) (arrow.Array, error) {
+	if left.Len() != right.Len() {
+		return nil, fmt.Errorf("array length mismatch: %d vs %d", left.Len(), right.Len())
+	}
+
+	// Both operands must be strings
+	if left.DataType().ID() != arrow.STRING || right.DataType().ID() != arrow.STRING {
+		return nil, fmt.Errorf("starts_with operation requires string operands, got %s and %s", left.DataType(), right.DataType())
+	}
+
+	leftStr, ok := asStringArray(left)
+	if !ok {
+		return nil, fmt.Errorf("failed to cast left array to String")
+	}
+
+	rightStr, ok := asStringArray(right)
+	if !ok {
+		return nil, fmt.Errorf("failed to cast right array to String")
+	}
+
+	pool := memory.NewGoAllocator()
+	builder := array.NewBooleanBuilder(pool)
+	defer builder.Release()
+
+	for i := 0; i < left.Len(); i++ {
+		if leftStr.IsNull(i) || rightStr.IsNull(i) {
+			builder.AppendNull()
+		} else {
+			leftVal := leftStr.Value(i)
+			rightVal := rightStr.Value(i)
+			result := strings.HasPrefix(leftVal, rightVal)
+			builder.Append(result)
+		}
+	}
+
+	return builder.NewArray(), nil
+}
+
+// evaluateEndsWith implements string ends_with comparison
+func (b *BinaryExpr) evaluateEndsWith(left, right arrow.Array) (arrow.Array, error) {
+	if left.Len() != right.Len() {
+		return nil, fmt.Errorf("array length mismatch: %d vs %d", left.Len(), right.Len())
+	}
+
+	// Both operands must be strings
+	if left.DataType().ID() != arrow.STRING || right.DataType().ID() != arrow.STRING {
+		return nil, fmt.Errorf("ends_with operation requires string operands, got %s and %s", left.DataType(), right.DataType())
+	}
+
+	leftStr, ok := asStringArray(left)
+	if !ok {
+		return nil, fmt.Errorf("failed to cast left array to String")
+	}
+
+	rightStr, ok := asStringArray(right)
+	if !ok {
+		return nil, fmt.Errorf("failed to cast right array to String")
+	}
+
+	pool := memory.NewGoAllocator()
+	builder := array.NewBooleanBuilder(pool)
+	defer builder.Release()
+
+	for i := 0; i < left.Len(); i++ {
+		if leftStr.IsNull(i) || rightStr.IsNull(i) {
+			builder.AppendNull()
+		} else {
+			leftVal := leftStr.Value(i)
+			rightVal := rightStr.Value(i)
+			result := strings.HasSuffix(leftVal, rightVal)
+			builder.Append(result)
+		}
+	}
+
+	return builder.NewArray(), nil
 }
 
 // Helper functions for safe type assertions
