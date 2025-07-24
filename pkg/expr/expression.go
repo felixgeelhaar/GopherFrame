@@ -51,6 +51,23 @@ type Expr interface {
 	Day() Expr
 	DayOfWeek() Expr
 	DateTrunc(unit string) Expr
+
+	// Vectorized operations using Arrow compute kernels
+	VectorizedAdd(other Expr) Expr
+	VectorizedSub(other Expr) Expr
+	VectorizedMul(other Expr) Expr
+	VectorizedDiv(other Expr) Expr
+	VectorizedGt(other Expr) Expr
+	VectorizedLt(other Expr) Expr
+	VectorizedEq(other Expr) Expr
+
+	// Vectorized aggregations
+	VectorizedSum() Expr
+	VectorizedMean() Expr
+	VectorizedMin() Expr
+	VectorizedMax() Expr
+	VectorizedStdDev() Expr
+	VectorizedVariance() Expr
 }
 
 // ColumnExpr represents a reference to an existing column.
