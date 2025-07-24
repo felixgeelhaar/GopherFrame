@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1753347737629,
+  "lastUpdate": 1753347912460,
   "repoUrl": "https://github.com/felixgeelhaar/GopherFrame",
   "entries": {
     "Benchmark": [
@@ -5950,6 +5950,1974 @@ window.BENCHMARK_DATA = {
             "value": 184,
             "unit": "allocs/op",
             "extra": "2186 times\n4 procs"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "felix@felixgeelhaar.de",
+            "name": "Felix Geelhaar",
+            "username": "felixgeelhaar"
+          },
+          "committer": {
+            "email": "felix@felixgeelhaar.de",
+            "name": "Felix Geelhaar",
+            "username": "felixgeelhaar"
+          },
+          "distinct": true,
+          "id": "ac6e1ecdda96eb48516395d277d19964648e11b6",
+          "message": "Implement comprehensive join functionality for DataFrames\n\n- Add InnerJoin and LeftJoin methods to public DataFrame API\n- Implement hash-based join algorithm in core DataFrame\n- Support for all Arrow data types (int64, float64, string, boolean)\n- Handle duplicate column names with automatic prefixing\n- Comprehensive null value handling for join keys\n- Memory-efficient with proper resource management\n- Add extensive test coverage with 8 comprehensive test cases\n- Performance tested with 10K+ row datasets\n- Exceeds v0.1 MVP scope - joins were planned for v0.2\n\nFeatures implemented:\n- df.InnerJoin(other, leftKey, rightKey) - rows with matches in both\n- df.LeftJoin(other, leftKey, rightKey) - all left rows + matching right\n- Column conflict resolution (right_columnname for duplicates)\n- Type-safe value extraction and comparison\n- Proper bounds checking and error handling\n\nAll tests passing with comprehensive edge case coverage.",
+          "timestamp": "2025-07-24T10:51:59+02:00",
+          "tree_id": "a8fa5d2c431efabb93a07afc2ed71cb1d34a6b9f",
+          "url": "https://github.com/felixgeelhaar/GopherFrame/commit/ac6e1ecdda96eb48516395d277d19964648e11b6"
+        },
+        "date": 1753347912012,
+        "tool": "go",
+        "benches": [
+          {
+            "name": "BenchmarkDataFrameCreation/Size_1000",
+            "value": 39204,
+            "unit": "ns/op\t   52412 B/op\t      60 allocs/op",
+            "extra": "30486 times\n4 procs"
+          },
+          {
+            "name": "BenchmarkDataFrameCreation/Size_1000 - ns/op",
+            "value": 39204,
+            "unit": "ns/op",
+            "extra": "30486 times\n4 procs"
+          },
+          {
+            "name": "BenchmarkDataFrameCreation/Size_1000 - B/op",
+            "value": 52412,
+            "unit": "B/op",
+            "extra": "30486 times\n4 procs"
+          },
+          {
+            "name": "BenchmarkDataFrameCreation/Size_1000 - allocs/op",
+            "value": 60,
+            "unit": "allocs/op",
+            "extra": "30486 times\n4 procs"
+          },
+          {
+            "name": "BenchmarkDataFrameCreation/Size_1000",
+            "value": 39591,
+            "unit": "ns/op\t   52411 B/op\t      60 allocs/op",
+            "extra": "29740 times\n4 procs"
+          },
+          {
+            "name": "BenchmarkDataFrameCreation/Size_1000 - ns/op",
+            "value": 39591,
+            "unit": "ns/op",
+            "extra": "29740 times\n4 procs"
+          },
+          {
+            "name": "BenchmarkDataFrameCreation/Size_1000 - B/op",
+            "value": 52411,
+            "unit": "B/op",
+            "extra": "29740 times\n4 procs"
+          },
+          {
+            "name": "BenchmarkDataFrameCreation/Size_1000 - allocs/op",
+            "value": 60,
+            "unit": "allocs/op",
+            "extra": "29740 times\n4 procs"
+          },
+          {
+            "name": "BenchmarkDataFrameCreation/Size_1000",
+            "value": 39826,
+            "unit": "ns/op\t   52411 B/op\t      60 allocs/op",
+            "extra": "29727 times\n4 procs"
+          },
+          {
+            "name": "BenchmarkDataFrameCreation/Size_1000 - ns/op",
+            "value": 39826,
+            "unit": "ns/op",
+            "extra": "29727 times\n4 procs"
+          },
+          {
+            "name": "BenchmarkDataFrameCreation/Size_1000 - B/op",
+            "value": 52411,
+            "unit": "B/op",
+            "extra": "29727 times\n4 procs"
+          },
+          {
+            "name": "BenchmarkDataFrameCreation/Size_1000 - allocs/op",
+            "value": 60,
+            "unit": "allocs/op",
+            "extra": "29727 times\n4 procs"
+          },
+          {
+            "name": "BenchmarkDataFrameCreation/Size_10000",
+            "value": 463373,
+            "unit": "ns/op\t  787911 B/op\t      88 allocs/op",
+            "extra": "2499 times\n4 procs"
+          },
+          {
+            "name": "BenchmarkDataFrameCreation/Size_10000 - ns/op",
+            "value": 463373,
+            "unit": "ns/op",
+            "extra": "2499 times\n4 procs"
+          },
+          {
+            "name": "BenchmarkDataFrameCreation/Size_10000 - B/op",
+            "value": 787911,
+            "unit": "B/op",
+            "extra": "2499 times\n4 procs"
+          },
+          {
+            "name": "BenchmarkDataFrameCreation/Size_10000 - allocs/op",
+            "value": 88,
+            "unit": "allocs/op",
+            "extra": "2499 times\n4 procs"
+          },
+          {
+            "name": "BenchmarkDataFrameCreation/Size_10000",
+            "value": 471636,
+            "unit": "ns/op\t  787911 B/op\t      88 allocs/op",
+            "extra": "2430 times\n4 procs"
+          },
+          {
+            "name": "BenchmarkDataFrameCreation/Size_10000 - ns/op",
+            "value": 471636,
+            "unit": "ns/op",
+            "extra": "2430 times\n4 procs"
+          },
+          {
+            "name": "BenchmarkDataFrameCreation/Size_10000 - B/op",
+            "value": 787911,
+            "unit": "B/op",
+            "extra": "2430 times\n4 procs"
+          },
+          {
+            "name": "BenchmarkDataFrameCreation/Size_10000 - allocs/op",
+            "value": 88,
+            "unit": "allocs/op",
+            "extra": "2430 times\n4 procs"
+          },
+          {
+            "name": "BenchmarkDataFrameCreation/Size_10000",
+            "value": 473845,
+            "unit": "ns/op\t  787911 B/op\t      88 allocs/op",
+            "extra": "2502 times\n4 procs"
+          },
+          {
+            "name": "BenchmarkDataFrameCreation/Size_10000 - ns/op",
+            "value": 473845,
+            "unit": "ns/op",
+            "extra": "2502 times\n4 procs"
+          },
+          {
+            "name": "BenchmarkDataFrameCreation/Size_10000 - B/op",
+            "value": 787911,
+            "unit": "B/op",
+            "extra": "2502 times\n4 procs"
+          },
+          {
+            "name": "BenchmarkDataFrameCreation/Size_10000 - allocs/op",
+            "value": 88,
+            "unit": "allocs/op",
+            "extra": "2502 times\n4 procs"
+          },
+          {
+            "name": "BenchmarkDataFrameCreation/Size_100000",
+            "value": 4146356,
+            "unit": "ns/op\t 5801465 B/op\t     111 allocs/op",
+            "extra": "273 times\n4 procs"
+          },
+          {
+            "name": "BenchmarkDataFrameCreation/Size_100000 - ns/op",
+            "value": 4146356,
+            "unit": "ns/op",
+            "extra": "273 times\n4 procs"
+          },
+          {
+            "name": "BenchmarkDataFrameCreation/Size_100000 - B/op",
+            "value": 5801465,
+            "unit": "B/op",
+            "extra": "273 times\n4 procs"
+          },
+          {
+            "name": "BenchmarkDataFrameCreation/Size_100000 - allocs/op",
+            "value": 111,
+            "unit": "allocs/op",
+            "extra": "273 times\n4 procs"
+          },
+          {
+            "name": "BenchmarkDataFrameCreation/Size_100000",
+            "value": 3685338,
+            "unit": "ns/op\t 5801466 B/op\t     111 allocs/op",
+            "extra": "319 times\n4 procs"
+          },
+          {
+            "name": "BenchmarkDataFrameCreation/Size_100000 - ns/op",
+            "value": 3685338,
+            "unit": "ns/op",
+            "extra": "319 times\n4 procs"
+          },
+          {
+            "name": "BenchmarkDataFrameCreation/Size_100000 - B/op",
+            "value": 5801466,
+            "unit": "B/op",
+            "extra": "319 times\n4 procs"
+          },
+          {
+            "name": "BenchmarkDataFrameCreation/Size_100000 - allocs/op",
+            "value": 111,
+            "unit": "allocs/op",
+            "extra": "319 times\n4 procs"
+          },
+          {
+            "name": "BenchmarkDataFrameCreation/Size_100000",
+            "value": 3938926,
+            "unit": "ns/op\t 5801465 B/op\t     111 allocs/op",
+            "extra": "327 times\n4 procs"
+          },
+          {
+            "name": "BenchmarkDataFrameCreation/Size_100000 - ns/op",
+            "value": 3938926,
+            "unit": "ns/op",
+            "extra": "327 times\n4 procs"
+          },
+          {
+            "name": "BenchmarkDataFrameCreation/Size_100000 - B/op",
+            "value": 5801465,
+            "unit": "B/op",
+            "extra": "327 times\n4 procs"
+          },
+          {
+            "name": "BenchmarkDataFrameCreation/Size_100000 - allocs/op",
+            "value": 111,
+            "unit": "allocs/op",
+            "extra": "327 times\n4 procs"
+          },
+          {
+            "name": "BenchmarkFilter/Size_1000",
+            "value": 53769,
+            "unit": "ns/op\t   48617 B/op\t      88 allocs/op",
+            "extra": "21742 times\n4 procs"
+          },
+          {
+            "name": "BenchmarkFilter/Size_1000 - ns/op",
+            "value": 53769,
+            "unit": "ns/op",
+            "extra": "21742 times\n4 procs"
+          },
+          {
+            "name": "BenchmarkFilter/Size_1000 - B/op",
+            "value": 48617,
+            "unit": "B/op",
+            "extra": "21742 times\n4 procs"
+          },
+          {
+            "name": "BenchmarkFilter/Size_1000 - allocs/op",
+            "value": 88,
+            "unit": "allocs/op",
+            "extra": "21742 times\n4 procs"
+          },
+          {
+            "name": "BenchmarkFilter/Size_1000",
+            "value": 54556,
+            "unit": "ns/op\t   48618 B/op\t      88 allocs/op",
+            "extra": "21814 times\n4 procs"
+          },
+          {
+            "name": "BenchmarkFilter/Size_1000 - ns/op",
+            "value": 54556,
+            "unit": "ns/op",
+            "extra": "21814 times\n4 procs"
+          },
+          {
+            "name": "BenchmarkFilter/Size_1000 - B/op",
+            "value": 48618,
+            "unit": "B/op",
+            "extra": "21814 times\n4 procs"
+          },
+          {
+            "name": "BenchmarkFilter/Size_1000 - allocs/op",
+            "value": 88,
+            "unit": "allocs/op",
+            "extra": "21814 times\n4 procs"
+          },
+          {
+            "name": "BenchmarkFilter/Size_1000",
+            "value": 54195,
+            "unit": "ns/op\t   48618 B/op\t      88 allocs/op",
+            "extra": "21903 times\n4 procs"
+          },
+          {
+            "name": "BenchmarkFilter/Size_1000 - ns/op",
+            "value": 54195,
+            "unit": "ns/op",
+            "extra": "21903 times\n4 procs"
+          },
+          {
+            "name": "BenchmarkFilter/Size_1000 - B/op",
+            "value": 48618,
+            "unit": "B/op",
+            "extra": "21903 times\n4 procs"
+          },
+          {
+            "name": "BenchmarkFilter/Size_1000 - allocs/op",
+            "value": 88,
+            "unit": "allocs/op",
+            "extra": "21903 times\n4 procs"
+          },
+          {
+            "name": "BenchmarkFilter/Size_10000",
+            "value": 578940,
+            "unit": "ns/op\t  717619 B/op\t     133 allocs/op",
+            "extra": "2074 times\n4 procs"
+          },
+          {
+            "name": "BenchmarkFilter/Size_10000 - ns/op",
+            "value": 578940,
+            "unit": "ns/op",
+            "extra": "2074 times\n4 procs"
+          },
+          {
+            "name": "BenchmarkFilter/Size_10000 - B/op",
+            "value": 717619,
+            "unit": "B/op",
+            "extra": "2074 times\n4 procs"
+          },
+          {
+            "name": "BenchmarkFilter/Size_10000 - allocs/op",
+            "value": 133,
+            "unit": "allocs/op",
+            "extra": "2074 times\n4 procs"
+          },
+          {
+            "name": "BenchmarkFilter/Size_10000",
+            "value": 578803,
+            "unit": "ns/op\t  717616 B/op\t     133 allocs/op",
+            "extra": "2138 times\n4 procs"
+          },
+          {
+            "name": "BenchmarkFilter/Size_10000 - ns/op",
+            "value": 578803,
+            "unit": "ns/op",
+            "extra": "2138 times\n4 procs"
+          },
+          {
+            "name": "BenchmarkFilter/Size_10000 - B/op",
+            "value": 717616,
+            "unit": "B/op",
+            "extra": "2138 times\n4 procs"
+          },
+          {
+            "name": "BenchmarkFilter/Size_10000 - allocs/op",
+            "value": 133,
+            "unit": "allocs/op",
+            "extra": "2138 times\n4 procs"
+          },
+          {
+            "name": "BenchmarkFilter/Size_10000",
+            "value": 572285,
+            "unit": "ns/op\t  717621 B/op\t     133 allocs/op",
+            "extra": "2169 times\n4 procs"
+          },
+          {
+            "name": "BenchmarkFilter/Size_10000 - ns/op",
+            "value": 572285,
+            "unit": "ns/op",
+            "extra": "2169 times\n4 procs"
+          },
+          {
+            "name": "BenchmarkFilter/Size_10000 - B/op",
+            "value": 717621,
+            "unit": "B/op",
+            "extra": "2169 times\n4 procs"
+          },
+          {
+            "name": "BenchmarkFilter/Size_10000 - allocs/op",
+            "value": 133,
+            "unit": "allocs/op",
+            "extra": "2169 times\n4 procs"
+          },
+          {
+            "name": "BenchmarkFilter/Size_100000",
+            "value": 4453459,
+            "unit": "ns/op\t 5226404 B/op\t     168 allocs/op",
+            "extra": "271 times\n4 procs"
+          },
+          {
+            "name": "BenchmarkFilter/Size_100000 - ns/op",
+            "value": 4453459,
+            "unit": "ns/op",
+            "extra": "271 times\n4 procs"
+          },
+          {
+            "name": "BenchmarkFilter/Size_100000 - B/op",
+            "value": 5226404,
+            "unit": "B/op",
+            "extra": "271 times\n4 procs"
+          },
+          {
+            "name": "BenchmarkFilter/Size_100000 - allocs/op",
+            "value": 168,
+            "unit": "allocs/op",
+            "extra": "271 times\n4 procs"
+          },
+          {
+            "name": "BenchmarkFilter/Size_100000",
+            "value": 4451520,
+            "unit": "ns/op\t 5226415 B/op\t     168 allocs/op",
+            "extra": "266 times\n4 procs"
+          },
+          {
+            "name": "BenchmarkFilter/Size_100000 - ns/op",
+            "value": 4451520,
+            "unit": "ns/op",
+            "extra": "266 times\n4 procs"
+          },
+          {
+            "name": "BenchmarkFilter/Size_100000 - B/op",
+            "value": 5226415,
+            "unit": "B/op",
+            "extra": "266 times\n4 procs"
+          },
+          {
+            "name": "BenchmarkFilter/Size_100000 - allocs/op",
+            "value": 168,
+            "unit": "allocs/op",
+            "extra": "266 times\n4 procs"
+          },
+          {
+            "name": "BenchmarkFilter/Size_100000",
+            "value": 4457319,
+            "unit": "ns/op\t 5226379 B/op\t     168 allocs/op",
+            "extra": "268 times\n4 procs"
+          },
+          {
+            "name": "BenchmarkFilter/Size_100000 - ns/op",
+            "value": 4457319,
+            "unit": "ns/op",
+            "extra": "268 times\n4 procs"
+          },
+          {
+            "name": "BenchmarkFilter/Size_100000 - B/op",
+            "value": 5226379,
+            "unit": "B/op",
+            "extra": "268 times\n4 procs"
+          },
+          {
+            "name": "BenchmarkFilter/Size_100000 - allocs/op",
+            "value": 168,
+            "unit": "allocs/op",
+            "extra": "268 times\n4 procs"
+          },
+          {
+            "name": "BenchmarkSelect/Size_1000",
+            "value": 1351,
+            "unit": "ns/op\t    1648 B/op\t      17 allocs/op",
+            "extra": "784652 times\n4 procs"
+          },
+          {
+            "name": "BenchmarkSelect/Size_1000 - ns/op",
+            "value": 1351,
+            "unit": "ns/op",
+            "extra": "784652 times\n4 procs"
+          },
+          {
+            "name": "BenchmarkSelect/Size_1000 - B/op",
+            "value": 1648,
+            "unit": "B/op",
+            "extra": "784652 times\n4 procs"
+          },
+          {
+            "name": "BenchmarkSelect/Size_1000 - allocs/op",
+            "value": 17,
+            "unit": "allocs/op",
+            "extra": "784652 times\n4 procs"
+          },
+          {
+            "name": "BenchmarkSelect/Size_1000",
+            "value": 1360,
+            "unit": "ns/op\t    1648 B/op\t      17 allocs/op",
+            "extra": "816162 times\n4 procs"
+          },
+          {
+            "name": "BenchmarkSelect/Size_1000 - ns/op",
+            "value": 1360,
+            "unit": "ns/op",
+            "extra": "816162 times\n4 procs"
+          },
+          {
+            "name": "BenchmarkSelect/Size_1000 - B/op",
+            "value": 1648,
+            "unit": "B/op",
+            "extra": "816162 times\n4 procs"
+          },
+          {
+            "name": "BenchmarkSelect/Size_1000 - allocs/op",
+            "value": 17,
+            "unit": "allocs/op",
+            "extra": "816162 times\n4 procs"
+          },
+          {
+            "name": "BenchmarkSelect/Size_1000",
+            "value": 1372,
+            "unit": "ns/op\t    1648 B/op\t      17 allocs/op",
+            "extra": "825349 times\n4 procs"
+          },
+          {
+            "name": "BenchmarkSelect/Size_1000 - ns/op",
+            "value": 1372,
+            "unit": "ns/op",
+            "extra": "825349 times\n4 procs"
+          },
+          {
+            "name": "BenchmarkSelect/Size_1000 - B/op",
+            "value": 1648,
+            "unit": "B/op",
+            "extra": "825349 times\n4 procs"
+          },
+          {
+            "name": "BenchmarkSelect/Size_1000 - allocs/op",
+            "value": 17,
+            "unit": "allocs/op",
+            "extra": "825349 times\n4 procs"
+          },
+          {
+            "name": "BenchmarkSelect/Size_10000",
+            "value": 1398,
+            "unit": "ns/op\t    1648 B/op\t      17 allocs/op",
+            "extra": "841040 times\n4 procs"
+          },
+          {
+            "name": "BenchmarkSelect/Size_10000 - ns/op",
+            "value": 1398,
+            "unit": "ns/op",
+            "extra": "841040 times\n4 procs"
+          },
+          {
+            "name": "BenchmarkSelect/Size_10000 - B/op",
+            "value": 1648,
+            "unit": "B/op",
+            "extra": "841040 times\n4 procs"
+          },
+          {
+            "name": "BenchmarkSelect/Size_10000 - allocs/op",
+            "value": 17,
+            "unit": "allocs/op",
+            "extra": "841040 times\n4 procs"
+          },
+          {
+            "name": "BenchmarkSelect/Size_10000",
+            "value": 1392,
+            "unit": "ns/op\t    1648 B/op\t      17 allocs/op",
+            "extra": "816488 times\n4 procs"
+          },
+          {
+            "name": "BenchmarkSelect/Size_10000 - ns/op",
+            "value": 1392,
+            "unit": "ns/op",
+            "extra": "816488 times\n4 procs"
+          },
+          {
+            "name": "BenchmarkSelect/Size_10000 - B/op",
+            "value": 1648,
+            "unit": "B/op",
+            "extra": "816488 times\n4 procs"
+          },
+          {
+            "name": "BenchmarkSelect/Size_10000 - allocs/op",
+            "value": 17,
+            "unit": "allocs/op",
+            "extra": "816488 times\n4 procs"
+          },
+          {
+            "name": "BenchmarkSelect/Size_10000",
+            "value": 1389,
+            "unit": "ns/op\t    1648 B/op\t      17 allocs/op",
+            "extra": "795252 times\n4 procs"
+          },
+          {
+            "name": "BenchmarkSelect/Size_10000 - ns/op",
+            "value": 1389,
+            "unit": "ns/op",
+            "extra": "795252 times\n4 procs"
+          },
+          {
+            "name": "BenchmarkSelect/Size_10000 - B/op",
+            "value": 1648,
+            "unit": "B/op",
+            "extra": "795252 times\n4 procs"
+          },
+          {
+            "name": "BenchmarkSelect/Size_10000 - allocs/op",
+            "value": 17,
+            "unit": "allocs/op",
+            "extra": "795252 times\n4 procs"
+          },
+          {
+            "name": "BenchmarkSelect/Size_100000",
+            "value": 1205,
+            "unit": "ns/op\t    1648 B/op\t      17 allocs/op",
+            "extra": "898081 times\n4 procs"
+          },
+          {
+            "name": "BenchmarkSelect/Size_100000 - ns/op",
+            "value": 1205,
+            "unit": "ns/op",
+            "extra": "898081 times\n4 procs"
+          },
+          {
+            "name": "BenchmarkSelect/Size_100000 - B/op",
+            "value": 1648,
+            "unit": "B/op",
+            "extra": "898081 times\n4 procs"
+          },
+          {
+            "name": "BenchmarkSelect/Size_100000 - allocs/op",
+            "value": 17,
+            "unit": "allocs/op",
+            "extra": "898081 times\n4 procs"
+          },
+          {
+            "name": "BenchmarkSelect/Size_100000",
+            "value": 1199,
+            "unit": "ns/op\t    1648 B/op\t      17 allocs/op",
+            "extra": "908472 times\n4 procs"
+          },
+          {
+            "name": "BenchmarkSelect/Size_100000 - ns/op",
+            "value": 1199,
+            "unit": "ns/op",
+            "extra": "908472 times\n4 procs"
+          },
+          {
+            "name": "BenchmarkSelect/Size_100000 - B/op",
+            "value": 1648,
+            "unit": "B/op",
+            "extra": "908472 times\n4 procs"
+          },
+          {
+            "name": "BenchmarkSelect/Size_100000 - allocs/op",
+            "value": 17,
+            "unit": "allocs/op",
+            "extra": "908472 times\n4 procs"
+          },
+          {
+            "name": "BenchmarkSelect/Size_100000",
+            "value": 1197,
+            "unit": "ns/op\t    1648 B/op\t      17 allocs/op",
+            "extra": "863486 times\n4 procs"
+          },
+          {
+            "name": "BenchmarkSelect/Size_100000 - ns/op",
+            "value": 1197,
+            "unit": "ns/op",
+            "extra": "863486 times\n4 procs"
+          },
+          {
+            "name": "BenchmarkSelect/Size_100000 - B/op",
+            "value": 1648,
+            "unit": "B/op",
+            "extra": "863486 times\n4 procs"
+          },
+          {
+            "name": "BenchmarkSelect/Size_100000 - allocs/op",
+            "value": 17,
+            "unit": "allocs/op",
+            "extra": "863486 times\n4 procs"
+          },
+          {
+            "name": "BenchmarkWithColumn/Size_1000",
+            "value": 29778,
+            "unit": "ns/op\t   42623 B/op\t      58 allocs/op",
+            "extra": "40628 times\n4 procs"
+          },
+          {
+            "name": "BenchmarkWithColumn/Size_1000 - ns/op",
+            "value": 29778,
+            "unit": "ns/op",
+            "extra": "40628 times\n4 procs"
+          },
+          {
+            "name": "BenchmarkWithColumn/Size_1000 - B/op",
+            "value": 42623,
+            "unit": "B/op",
+            "extra": "40628 times\n4 procs"
+          },
+          {
+            "name": "BenchmarkWithColumn/Size_1000 - allocs/op",
+            "value": 58,
+            "unit": "allocs/op",
+            "extra": "40628 times\n4 procs"
+          },
+          {
+            "name": "BenchmarkWithColumn/Size_1000",
+            "value": 29696,
+            "unit": "ns/op\t   42623 B/op\t      58 allocs/op",
+            "extra": "41144 times\n4 procs"
+          },
+          {
+            "name": "BenchmarkWithColumn/Size_1000 - ns/op",
+            "value": 29696,
+            "unit": "ns/op",
+            "extra": "41144 times\n4 procs"
+          },
+          {
+            "name": "BenchmarkWithColumn/Size_1000 - B/op",
+            "value": 42623,
+            "unit": "B/op",
+            "extra": "41144 times\n4 procs"
+          },
+          {
+            "name": "BenchmarkWithColumn/Size_1000 - allocs/op",
+            "value": 58,
+            "unit": "allocs/op",
+            "extra": "41144 times\n4 procs"
+          },
+          {
+            "name": "BenchmarkWithColumn/Size_1000",
+            "value": 29955,
+            "unit": "ns/op\t   42623 B/op\t      58 allocs/op",
+            "extra": "40989 times\n4 procs"
+          },
+          {
+            "name": "BenchmarkWithColumn/Size_1000 - ns/op",
+            "value": 29955,
+            "unit": "ns/op",
+            "extra": "40989 times\n4 procs"
+          },
+          {
+            "name": "BenchmarkWithColumn/Size_1000 - B/op",
+            "value": 42623,
+            "unit": "B/op",
+            "extra": "40989 times\n4 procs"
+          },
+          {
+            "name": "BenchmarkWithColumn/Size_1000 - allocs/op",
+            "value": 58,
+            "unit": "allocs/op",
+            "extra": "40989 times\n4 procs"
+          },
+          {
+            "name": "BenchmarkWithColumn/Size_10000",
+            "value": 318038,
+            "unit": "ns/op\t  596194 B/op\t      74 allocs/op",
+            "extra": "3621 times\n4 procs"
+          },
+          {
+            "name": "BenchmarkWithColumn/Size_10000 - ns/op",
+            "value": 318038,
+            "unit": "ns/op",
+            "extra": "3621 times\n4 procs"
+          },
+          {
+            "name": "BenchmarkWithColumn/Size_10000 - B/op",
+            "value": 596194,
+            "unit": "B/op",
+            "extra": "3621 times\n4 procs"
+          },
+          {
+            "name": "BenchmarkWithColumn/Size_10000 - allocs/op",
+            "value": 74,
+            "unit": "allocs/op",
+            "extra": "3621 times\n4 procs"
+          },
+          {
+            "name": "BenchmarkWithColumn/Size_10000",
+            "value": 312569,
+            "unit": "ns/op\t  596197 B/op\t      74 allocs/op",
+            "extra": "3876 times\n4 procs"
+          },
+          {
+            "name": "BenchmarkWithColumn/Size_10000 - ns/op",
+            "value": 312569,
+            "unit": "ns/op",
+            "extra": "3876 times\n4 procs"
+          },
+          {
+            "name": "BenchmarkWithColumn/Size_10000 - B/op",
+            "value": 596197,
+            "unit": "B/op",
+            "extra": "3876 times\n4 procs"
+          },
+          {
+            "name": "BenchmarkWithColumn/Size_10000 - allocs/op",
+            "value": 74,
+            "unit": "allocs/op",
+            "extra": "3876 times\n4 procs"
+          },
+          {
+            "name": "BenchmarkWithColumn/Size_10000",
+            "value": 311131,
+            "unit": "ns/op\t  596198 B/op\t      74 allocs/op",
+            "extra": "3718 times\n4 procs"
+          },
+          {
+            "name": "BenchmarkWithColumn/Size_10000 - ns/op",
+            "value": 311131,
+            "unit": "ns/op",
+            "extra": "3718 times\n4 procs"
+          },
+          {
+            "name": "BenchmarkWithColumn/Size_10000 - B/op",
+            "value": 596198,
+            "unit": "B/op",
+            "extra": "3718 times\n4 procs"
+          },
+          {
+            "name": "BenchmarkWithColumn/Size_10000 - allocs/op",
+            "value": 74,
+            "unit": "allocs/op",
+            "extra": "3718 times\n4 procs"
+          },
+          {
+            "name": "BenchmarkWithColumn/Size_100000",
+            "value": 1964098,
+            "unit": "ns/op\t 4381144 B/op\t      88 allocs/op",
+            "extra": "615 times\n4 procs"
+          },
+          {
+            "name": "BenchmarkWithColumn/Size_100000 - ns/op",
+            "value": 1964098,
+            "unit": "ns/op",
+            "extra": "615 times\n4 procs"
+          },
+          {
+            "name": "BenchmarkWithColumn/Size_100000 - B/op",
+            "value": 4381144,
+            "unit": "B/op",
+            "extra": "615 times\n4 procs"
+          },
+          {
+            "name": "BenchmarkWithColumn/Size_100000 - allocs/op",
+            "value": 88,
+            "unit": "allocs/op",
+            "extra": "615 times\n4 procs"
+          },
+          {
+            "name": "BenchmarkWithColumn/Size_100000",
+            "value": 1932306,
+            "unit": "ns/op\t 4381134 B/op\t      88 allocs/op",
+            "extra": "596 times\n4 procs"
+          },
+          {
+            "name": "BenchmarkWithColumn/Size_100000 - ns/op",
+            "value": 1932306,
+            "unit": "ns/op",
+            "extra": "596 times\n4 procs"
+          },
+          {
+            "name": "BenchmarkWithColumn/Size_100000 - B/op",
+            "value": 4381134,
+            "unit": "B/op",
+            "extra": "596 times\n4 procs"
+          },
+          {
+            "name": "BenchmarkWithColumn/Size_100000 - allocs/op",
+            "value": 88,
+            "unit": "allocs/op",
+            "extra": "596 times\n4 procs"
+          },
+          {
+            "name": "BenchmarkWithColumn/Size_100000",
+            "value": 1988744,
+            "unit": "ns/op\t 4381143 B/op\t      88 allocs/op",
+            "extra": "601 times\n4 procs"
+          },
+          {
+            "name": "BenchmarkWithColumn/Size_100000 - ns/op",
+            "value": 1988744,
+            "unit": "ns/op",
+            "extra": "601 times\n4 procs"
+          },
+          {
+            "name": "BenchmarkWithColumn/Size_100000 - B/op",
+            "value": 4381143,
+            "unit": "B/op",
+            "extra": "601 times\n4 procs"
+          },
+          {
+            "name": "BenchmarkWithColumn/Size_100000 - allocs/op",
+            "value": 88,
+            "unit": "allocs/op",
+            "extra": "601 times\n4 procs"
+          },
+          {
+            "name": "BenchmarkGroupBySum/Size_1000",
+            "value": 60366,
+            "unit": "ns/op\t   27776 B/op\t     144 allocs/op",
+            "extra": "19681 times\n4 procs"
+          },
+          {
+            "name": "BenchmarkGroupBySum/Size_1000 - ns/op",
+            "value": 60366,
+            "unit": "ns/op",
+            "extra": "19681 times\n4 procs"
+          },
+          {
+            "name": "BenchmarkGroupBySum/Size_1000 - B/op",
+            "value": 27776,
+            "unit": "B/op",
+            "extra": "19681 times\n4 procs"
+          },
+          {
+            "name": "BenchmarkGroupBySum/Size_1000 - allocs/op",
+            "value": 144,
+            "unit": "allocs/op",
+            "extra": "19681 times\n4 procs"
+          },
+          {
+            "name": "BenchmarkGroupBySum/Size_1000",
+            "value": 60518,
+            "unit": "ns/op\t   27776 B/op\t     144 allocs/op",
+            "extra": "19981 times\n4 procs"
+          },
+          {
+            "name": "BenchmarkGroupBySum/Size_1000 - ns/op",
+            "value": 60518,
+            "unit": "ns/op",
+            "extra": "19981 times\n4 procs"
+          },
+          {
+            "name": "BenchmarkGroupBySum/Size_1000 - B/op",
+            "value": 27776,
+            "unit": "B/op",
+            "extra": "19981 times\n4 procs"
+          },
+          {
+            "name": "BenchmarkGroupBySum/Size_1000 - allocs/op",
+            "value": 144,
+            "unit": "allocs/op",
+            "extra": "19981 times\n4 procs"
+          },
+          {
+            "name": "BenchmarkGroupBySum/Size_1000",
+            "value": 60615,
+            "unit": "ns/op\t   27776 B/op\t     144 allocs/op",
+            "extra": "19760 times\n4 procs"
+          },
+          {
+            "name": "BenchmarkGroupBySum/Size_1000 - ns/op",
+            "value": 60615,
+            "unit": "ns/op",
+            "extra": "19760 times\n4 procs"
+          },
+          {
+            "name": "BenchmarkGroupBySum/Size_1000 - B/op",
+            "value": 27776,
+            "unit": "B/op",
+            "extra": "19760 times\n4 procs"
+          },
+          {
+            "name": "BenchmarkGroupBySum/Size_1000 - allocs/op",
+            "value": 144,
+            "unit": "allocs/op",
+            "extra": "19760 times\n4 procs"
+          },
+          {
+            "name": "BenchmarkGroupBySum/Size_10000",
+            "value": 518375,
+            "unit": "ns/op\t  259463 B/op\t     184 allocs/op",
+            "extra": "2263 times\n4 procs"
+          },
+          {
+            "name": "BenchmarkGroupBySum/Size_10000 - ns/op",
+            "value": 518375,
+            "unit": "ns/op",
+            "extra": "2263 times\n4 procs"
+          },
+          {
+            "name": "BenchmarkGroupBySum/Size_10000 - B/op",
+            "value": 259463,
+            "unit": "B/op",
+            "extra": "2263 times\n4 procs"
+          },
+          {
+            "name": "BenchmarkGroupBySum/Size_10000 - allocs/op",
+            "value": 184,
+            "unit": "allocs/op",
+            "extra": "2263 times\n4 procs"
+          },
+          {
+            "name": "BenchmarkGroupBySum/Size_10000",
+            "value": 513756,
+            "unit": "ns/op\t  259462 B/op\t     184 allocs/op",
+            "extra": "2300 times\n4 procs"
+          },
+          {
+            "name": "BenchmarkGroupBySum/Size_10000 - ns/op",
+            "value": 513756,
+            "unit": "ns/op",
+            "extra": "2300 times\n4 procs"
+          },
+          {
+            "name": "BenchmarkGroupBySum/Size_10000 - B/op",
+            "value": 259462,
+            "unit": "B/op",
+            "extra": "2300 times\n4 procs"
+          },
+          {
+            "name": "BenchmarkGroupBySum/Size_10000 - allocs/op",
+            "value": 184,
+            "unit": "allocs/op",
+            "extra": "2300 times\n4 procs"
+          },
+          {
+            "name": "BenchmarkGroupBySum/Size_10000",
+            "value": 517055,
+            "unit": "ns/op\t  259461 B/op\t     184 allocs/op",
+            "extra": "2326 times\n4 procs"
+          },
+          {
+            "name": "BenchmarkGroupBySum/Size_10000 - ns/op",
+            "value": 517055,
+            "unit": "ns/op",
+            "extra": "2326 times\n4 procs"
+          },
+          {
+            "name": "BenchmarkGroupBySum/Size_10000 - B/op",
+            "value": 259461,
+            "unit": "B/op",
+            "extra": "2326 times\n4 procs"
+          },
+          {
+            "name": "BenchmarkGroupBySum/Size_10000 - allocs/op",
+            "value": 184,
+            "unit": "allocs/op",
+            "extra": "2326 times\n4 procs"
+          },
+          {
+            "name": "BenchmarkGroupBySum/Size_100000",
+            "value": 5105568,
+            "unit": "ns/op\t 3583650 B/op\t     255 allocs/op",
+            "extra": "236 times\n4 procs"
+          },
+          {
+            "name": "BenchmarkGroupBySum/Size_100000 - ns/op",
+            "value": 5105568,
+            "unit": "ns/op",
+            "extra": "236 times\n4 procs"
+          },
+          {
+            "name": "BenchmarkGroupBySum/Size_100000 - B/op",
+            "value": 3583650,
+            "unit": "B/op",
+            "extra": "236 times\n4 procs"
+          },
+          {
+            "name": "BenchmarkGroupBySum/Size_100000 - allocs/op",
+            "value": 255,
+            "unit": "allocs/op",
+            "extra": "236 times\n4 procs"
+          },
+          {
+            "name": "BenchmarkGroupBySum/Size_100000",
+            "value": 5095522,
+            "unit": "ns/op\t 3583648 B/op\t     255 allocs/op",
+            "extra": "234 times\n4 procs"
+          },
+          {
+            "name": "BenchmarkGroupBySum/Size_100000 - ns/op",
+            "value": 5095522,
+            "unit": "ns/op",
+            "extra": "234 times\n4 procs"
+          },
+          {
+            "name": "BenchmarkGroupBySum/Size_100000 - B/op",
+            "value": 3583648,
+            "unit": "B/op",
+            "extra": "234 times\n4 procs"
+          },
+          {
+            "name": "BenchmarkGroupBySum/Size_100000 - allocs/op",
+            "value": 255,
+            "unit": "allocs/op",
+            "extra": "234 times\n4 procs"
+          },
+          {
+            "name": "BenchmarkGroupBySum/Size_100000",
+            "value": 5100712,
+            "unit": "ns/op\t 3583653 B/op\t     255 allocs/op",
+            "extra": "236 times\n4 procs"
+          },
+          {
+            "name": "BenchmarkGroupBySum/Size_100000 - ns/op",
+            "value": 5100712,
+            "unit": "ns/op",
+            "extra": "236 times\n4 procs"
+          },
+          {
+            "name": "BenchmarkGroupBySum/Size_100000 - B/op",
+            "value": 3583653,
+            "unit": "B/op",
+            "extra": "236 times\n4 procs"
+          },
+          {
+            "name": "BenchmarkGroupBySum/Size_100000 - allocs/op",
+            "value": 255,
+            "unit": "allocs/op",
+            "extra": "236 times\n4 procs"
+          },
+          {
+            "name": "BenchmarkGroupByMultipleAgg/Size_1000",
+            "value": 133818,
+            "unit": "ns/op\t   54130 B/op\t    2233 allocs/op",
+            "extra": "8667 times\n4 procs"
+          },
+          {
+            "name": "BenchmarkGroupByMultipleAgg/Size_1000 - ns/op",
+            "value": 133818,
+            "unit": "ns/op",
+            "extra": "8667 times\n4 procs"
+          },
+          {
+            "name": "BenchmarkGroupByMultipleAgg/Size_1000 - B/op",
+            "value": 54130,
+            "unit": "B/op",
+            "extra": "8667 times\n4 procs"
+          },
+          {
+            "name": "BenchmarkGroupByMultipleAgg/Size_1000 - allocs/op",
+            "value": 2233,
+            "unit": "allocs/op",
+            "extra": "8667 times\n4 procs"
+          },
+          {
+            "name": "BenchmarkGroupByMultipleAgg/Size_1000",
+            "value": 132473,
+            "unit": "ns/op\t   54129 B/op\t    2233 allocs/op",
+            "extra": "8182 times\n4 procs"
+          },
+          {
+            "name": "BenchmarkGroupByMultipleAgg/Size_1000 - ns/op",
+            "value": 132473,
+            "unit": "ns/op",
+            "extra": "8182 times\n4 procs"
+          },
+          {
+            "name": "BenchmarkGroupByMultipleAgg/Size_1000 - B/op",
+            "value": 54129,
+            "unit": "B/op",
+            "extra": "8182 times\n4 procs"
+          },
+          {
+            "name": "BenchmarkGroupByMultipleAgg/Size_1000 - allocs/op",
+            "value": 2233,
+            "unit": "allocs/op",
+            "extra": "8182 times\n4 procs"
+          },
+          {
+            "name": "BenchmarkGroupByMultipleAgg/Size_1000",
+            "value": 135640,
+            "unit": "ns/op\t   54129 B/op\t    2233 allocs/op",
+            "extra": "8750 times\n4 procs"
+          },
+          {
+            "name": "BenchmarkGroupByMultipleAgg/Size_1000 - ns/op",
+            "value": 135640,
+            "unit": "ns/op",
+            "extra": "8750 times\n4 procs"
+          },
+          {
+            "name": "BenchmarkGroupByMultipleAgg/Size_1000 - B/op",
+            "value": 54129,
+            "unit": "B/op",
+            "extra": "8750 times\n4 procs"
+          },
+          {
+            "name": "BenchmarkGroupByMultipleAgg/Size_1000 - allocs/op",
+            "value": 2233,
+            "unit": "allocs/op",
+            "extra": "8750 times\n4 procs"
+          },
+          {
+            "name": "BenchmarkGroupByMultipleAgg/Size_10000",
+            "value": 1135110,
+            "unit": "ns/op\t  429818 B/op\t   20273 allocs/op",
+            "extra": "1068 times\n4 procs"
+          },
+          {
+            "name": "BenchmarkGroupByMultipleAgg/Size_10000 - ns/op",
+            "value": 1135110,
+            "unit": "ns/op",
+            "extra": "1068 times\n4 procs"
+          },
+          {
+            "name": "BenchmarkGroupByMultipleAgg/Size_10000 - B/op",
+            "value": 429818,
+            "unit": "B/op",
+            "extra": "1068 times\n4 procs"
+          },
+          {
+            "name": "BenchmarkGroupByMultipleAgg/Size_10000 - allocs/op",
+            "value": 20273,
+            "unit": "allocs/op",
+            "extra": "1068 times\n4 procs"
+          },
+          {
+            "name": "BenchmarkGroupByMultipleAgg/Size_10000",
+            "value": 1124762,
+            "unit": "ns/op\t  429818 B/op\t   20273 allocs/op",
+            "extra": "1038 times\n4 procs"
+          },
+          {
+            "name": "BenchmarkGroupByMultipleAgg/Size_10000 - ns/op",
+            "value": 1124762,
+            "unit": "ns/op",
+            "extra": "1038 times\n4 procs"
+          },
+          {
+            "name": "BenchmarkGroupByMultipleAgg/Size_10000 - B/op",
+            "value": 429818,
+            "unit": "B/op",
+            "extra": "1038 times\n4 procs"
+          },
+          {
+            "name": "BenchmarkGroupByMultipleAgg/Size_10000 - allocs/op",
+            "value": 20273,
+            "unit": "allocs/op",
+            "extra": "1038 times\n4 procs"
+          },
+          {
+            "name": "BenchmarkGroupByMultipleAgg/Size_10000",
+            "value": 1132712,
+            "unit": "ns/op\t  429821 B/op\t   20273 allocs/op",
+            "extra": "1040 times\n4 procs"
+          },
+          {
+            "name": "BenchmarkGroupByMultipleAgg/Size_10000 - ns/op",
+            "value": 1132712,
+            "unit": "ns/op",
+            "extra": "1040 times\n4 procs"
+          },
+          {
+            "name": "BenchmarkGroupByMultipleAgg/Size_10000 - B/op",
+            "value": 429821,
+            "unit": "B/op",
+            "extra": "1040 times\n4 procs"
+          },
+          {
+            "name": "BenchmarkGroupByMultipleAgg/Size_10000 - allocs/op",
+            "value": 20273,
+            "unit": "allocs/op",
+            "extra": "1040 times\n4 procs"
+          },
+          {
+            "name": "BenchmarkChainedOperations/Size_1000",
+            "value": 94791,
+            "unit": "ns/op\t  119181 B/op\t     173 allocs/op",
+            "extra": "12535 times\n4 procs"
+          },
+          {
+            "name": "BenchmarkChainedOperations/Size_1000 - ns/op",
+            "value": 94791,
+            "unit": "ns/op",
+            "extra": "12535 times\n4 procs"
+          },
+          {
+            "name": "BenchmarkChainedOperations/Size_1000 - B/op",
+            "value": 119181,
+            "unit": "B/op",
+            "extra": "12535 times\n4 procs"
+          },
+          {
+            "name": "BenchmarkChainedOperations/Size_1000 - allocs/op",
+            "value": 173,
+            "unit": "allocs/op",
+            "extra": "12535 times\n4 procs"
+          },
+          {
+            "name": "BenchmarkChainedOperations/Size_1000",
+            "value": 94829,
+            "unit": "ns/op\t  119181 B/op\t     173 allocs/op",
+            "extra": "12603 times\n4 procs"
+          },
+          {
+            "name": "BenchmarkChainedOperations/Size_1000 - ns/op",
+            "value": 94829,
+            "unit": "ns/op",
+            "extra": "12603 times\n4 procs"
+          },
+          {
+            "name": "BenchmarkChainedOperations/Size_1000 - B/op",
+            "value": 119181,
+            "unit": "B/op",
+            "extra": "12603 times\n4 procs"
+          },
+          {
+            "name": "BenchmarkChainedOperations/Size_1000 - allocs/op",
+            "value": 173,
+            "unit": "allocs/op",
+            "extra": "12603 times\n4 procs"
+          },
+          {
+            "name": "BenchmarkChainedOperations/Size_1000",
+            "value": 96324,
+            "unit": "ns/op\t  119181 B/op\t     173 allocs/op",
+            "extra": "12627 times\n4 procs"
+          },
+          {
+            "name": "BenchmarkChainedOperations/Size_1000 - ns/op",
+            "value": 96324,
+            "unit": "ns/op",
+            "extra": "12627 times\n4 procs"
+          },
+          {
+            "name": "BenchmarkChainedOperations/Size_1000 - B/op",
+            "value": 119181,
+            "unit": "B/op",
+            "extra": "12627 times\n4 procs"
+          },
+          {
+            "name": "BenchmarkChainedOperations/Size_1000 - allocs/op",
+            "value": 173,
+            "unit": "allocs/op",
+            "extra": "12627 times\n4 procs"
+          },
+          {
+            "name": "BenchmarkChainedOperations/Size_10000",
+            "value": 797515,
+            "unit": "ns/op\t 1033033 B/op\t     223 allocs/op",
+            "extra": "1568 times\n4 procs"
+          },
+          {
+            "name": "BenchmarkChainedOperations/Size_10000 - ns/op",
+            "value": 797515,
+            "unit": "ns/op",
+            "extra": "1568 times\n4 procs"
+          },
+          {
+            "name": "BenchmarkChainedOperations/Size_10000 - B/op",
+            "value": 1033033,
+            "unit": "B/op",
+            "extra": "1568 times\n4 procs"
+          },
+          {
+            "name": "BenchmarkChainedOperations/Size_10000 - allocs/op",
+            "value": 223,
+            "unit": "allocs/op",
+            "extra": "1568 times\n4 procs"
+          },
+          {
+            "name": "BenchmarkChainedOperations/Size_10000",
+            "value": 785410,
+            "unit": "ns/op\t 1033032 B/op\t     223 allocs/op",
+            "extra": "1532 times\n4 procs"
+          },
+          {
+            "name": "BenchmarkChainedOperations/Size_10000 - ns/op",
+            "value": 785410,
+            "unit": "ns/op",
+            "extra": "1532 times\n4 procs"
+          },
+          {
+            "name": "BenchmarkChainedOperations/Size_10000 - B/op",
+            "value": 1033032,
+            "unit": "B/op",
+            "extra": "1532 times\n4 procs"
+          },
+          {
+            "name": "BenchmarkChainedOperations/Size_10000 - allocs/op",
+            "value": 223,
+            "unit": "allocs/op",
+            "extra": "1532 times\n4 procs"
+          },
+          {
+            "name": "BenchmarkChainedOperations/Size_10000",
+            "value": 787334,
+            "unit": "ns/op\t 1033031 B/op\t     223 allocs/op",
+            "extra": "1497 times\n4 procs"
+          },
+          {
+            "name": "BenchmarkChainedOperations/Size_10000 - ns/op",
+            "value": 787334,
+            "unit": "ns/op",
+            "extra": "1497 times\n4 procs"
+          },
+          {
+            "name": "BenchmarkChainedOperations/Size_10000 - B/op",
+            "value": 1033031,
+            "unit": "B/op",
+            "extra": "1497 times\n4 procs"
+          },
+          {
+            "name": "BenchmarkChainedOperations/Size_10000 - allocs/op",
+            "value": 223,
+            "unit": "allocs/op",
+            "extra": "1497 times\n4 procs"
+          },
+          {
+            "name": "BenchmarkParquetWrite/Size_1000",
+            "value": 721122,
+            "unit": "ns/op\t  318379 B/op\t    3277 allocs/op",
+            "extra": "1656 times\n4 procs"
+          },
+          {
+            "name": "BenchmarkParquetWrite/Size_1000 - ns/op",
+            "value": 721122,
+            "unit": "ns/op",
+            "extra": "1656 times\n4 procs"
+          },
+          {
+            "name": "BenchmarkParquetWrite/Size_1000 - B/op",
+            "value": 318379,
+            "unit": "B/op",
+            "extra": "1656 times\n4 procs"
+          },
+          {
+            "name": "BenchmarkParquetWrite/Size_1000 - allocs/op",
+            "value": 3277,
+            "unit": "allocs/op",
+            "extra": "1656 times\n4 procs"
+          },
+          {
+            "name": "BenchmarkParquetWrite/Size_1000",
+            "value": 677900,
+            "unit": "ns/op\t  318342 B/op\t    3277 allocs/op",
+            "extra": "1635 times\n4 procs"
+          },
+          {
+            "name": "BenchmarkParquetWrite/Size_1000 - ns/op",
+            "value": 677900,
+            "unit": "ns/op",
+            "extra": "1635 times\n4 procs"
+          },
+          {
+            "name": "BenchmarkParquetWrite/Size_1000 - B/op",
+            "value": 318342,
+            "unit": "B/op",
+            "extra": "1635 times\n4 procs"
+          },
+          {
+            "name": "BenchmarkParquetWrite/Size_1000 - allocs/op",
+            "value": 3277,
+            "unit": "allocs/op",
+            "extra": "1635 times\n4 procs"
+          },
+          {
+            "name": "BenchmarkParquetWrite/Size_1000",
+            "value": 680049,
+            "unit": "ns/op\t  318233 B/op\t    3277 allocs/op",
+            "extra": "1812 times\n4 procs"
+          },
+          {
+            "name": "BenchmarkParquetWrite/Size_1000 - ns/op",
+            "value": 680049,
+            "unit": "ns/op",
+            "extra": "1812 times\n4 procs"
+          },
+          {
+            "name": "BenchmarkParquetWrite/Size_1000 - B/op",
+            "value": 318233,
+            "unit": "B/op",
+            "extra": "1812 times\n4 procs"
+          },
+          {
+            "name": "BenchmarkParquetWrite/Size_1000 - allocs/op",
+            "value": 3277,
+            "unit": "allocs/op",
+            "extra": "1812 times\n4 procs"
+          },
+          {
+            "name": "BenchmarkParquetWrite/Size_10000",
+            "value": 3831771,
+            "unit": "ns/op\t 3480991 B/op\t   30227 allocs/op",
+            "extra": "308 times\n4 procs"
+          },
+          {
+            "name": "BenchmarkParquetWrite/Size_10000 - ns/op",
+            "value": 3831771,
+            "unit": "ns/op",
+            "extra": "308 times\n4 procs"
+          },
+          {
+            "name": "BenchmarkParquetWrite/Size_10000 - B/op",
+            "value": 3480991,
+            "unit": "B/op",
+            "extra": "308 times\n4 procs"
+          },
+          {
+            "name": "BenchmarkParquetWrite/Size_10000 - allocs/op",
+            "value": 30227,
+            "unit": "allocs/op",
+            "extra": "308 times\n4 procs"
+          },
+          {
+            "name": "BenchmarkParquetWrite/Size_10000",
+            "value": 3904138,
+            "unit": "ns/op\t 3481202 B/op\t   30227 allocs/op",
+            "extra": "294 times\n4 procs"
+          },
+          {
+            "name": "BenchmarkParquetWrite/Size_10000 - ns/op",
+            "value": 3904138,
+            "unit": "ns/op",
+            "extra": "294 times\n4 procs"
+          },
+          {
+            "name": "BenchmarkParquetWrite/Size_10000 - B/op",
+            "value": 3481202,
+            "unit": "B/op",
+            "extra": "294 times\n4 procs"
+          },
+          {
+            "name": "BenchmarkParquetWrite/Size_10000 - allocs/op",
+            "value": 30227,
+            "unit": "allocs/op",
+            "extra": "294 times\n4 procs"
+          },
+          {
+            "name": "BenchmarkParquetWrite/Size_10000",
+            "value": 3734257,
+            "unit": "ns/op\t 3478192 B/op\t   30225 allocs/op",
+            "extra": "308 times\n4 procs"
+          },
+          {
+            "name": "BenchmarkParquetWrite/Size_10000 - ns/op",
+            "value": 3734257,
+            "unit": "ns/op",
+            "extra": "308 times\n4 procs"
+          },
+          {
+            "name": "BenchmarkParquetWrite/Size_10000 - B/op",
+            "value": 3478192,
+            "unit": "B/op",
+            "extra": "308 times\n4 procs"
+          },
+          {
+            "name": "BenchmarkParquetWrite/Size_10000 - allocs/op",
+            "value": 30225,
+            "unit": "allocs/op",
+            "extra": "308 times\n4 procs"
+          },
+          {
+            "name": "BenchmarkParquetRead/Size_1000",
+            "value": 272168,
+            "unit": "ns/op\t  285264 B/op\t     576 allocs/op",
+            "extra": "4254 times\n4 procs"
+          },
+          {
+            "name": "BenchmarkParquetRead/Size_1000 - ns/op",
+            "value": 272168,
+            "unit": "ns/op",
+            "extra": "4254 times\n4 procs"
+          },
+          {
+            "name": "BenchmarkParquetRead/Size_1000 - B/op",
+            "value": 285264,
+            "unit": "B/op",
+            "extra": "4254 times\n4 procs"
+          },
+          {
+            "name": "BenchmarkParquetRead/Size_1000 - allocs/op",
+            "value": 576,
+            "unit": "allocs/op",
+            "extra": "4254 times\n4 procs"
+          },
+          {
+            "name": "BenchmarkParquetRead/Size_1000",
+            "value": 274077,
+            "unit": "ns/op\t  285661 B/op\t     576 allocs/op",
+            "extra": "4214 times\n4 procs"
+          },
+          {
+            "name": "BenchmarkParquetRead/Size_1000 - ns/op",
+            "value": 274077,
+            "unit": "ns/op",
+            "extra": "4214 times\n4 procs"
+          },
+          {
+            "name": "BenchmarkParquetRead/Size_1000 - B/op",
+            "value": 285661,
+            "unit": "B/op",
+            "extra": "4214 times\n4 procs"
+          },
+          {
+            "name": "BenchmarkParquetRead/Size_1000 - allocs/op",
+            "value": 576,
+            "unit": "allocs/op",
+            "extra": "4214 times\n4 procs"
+          },
+          {
+            "name": "BenchmarkParquetRead/Size_1000",
+            "value": 278237,
+            "unit": "ns/op\t  285606 B/op\t     576 allocs/op",
+            "extra": "4185 times\n4 procs"
+          },
+          {
+            "name": "BenchmarkParquetRead/Size_1000 - ns/op",
+            "value": 278237,
+            "unit": "ns/op",
+            "extra": "4185 times\n4 procs"
+          },
+          {
+            "name": "BenchmarkParquetRead/Size_1000 - B/op",
+            "value": 285606,
+            "unit": "B/op",
+            "extra": "4185 times\n4 procs"
+          },
+          {
+            "name": "BenchmarkParquetRead/Size_1000 - allocs/op",
+            "value": 576,
+            "unit": "allocs/op",
+            "extra": "4185 times\n4 procs"
+          },
+          {
+            "name": "BenchmarkParquetRead/Size_10000",
+            "value": 821421,
+            "unit": "ns/op\t 1330857 B/op\t     693 allocs/op",
+            "extra": "1404 times\n4 procs"
+          },
+          {
+            "name": "BenchmarkParquetRead/Size_10000 - ns/op",
+            "value": 821421,
+            "unit": "ns/op",
+            "extra": "1404 times\n4 procs"
+          },
+          {
+            "name": "BenchmarkParquetRead/Size_10000 - B/op",
+            "value": 1330857,
+            "unit": "B/op",
+            "extra": "1404 times\n4 procs"
+          },
+          {
+            "name": "BenchmarkParquetRead/Size_10000 - allocs/op",
+            "value": 693,
+            "unit": "allocs/op",
+            "extra": "1404 times\n4 procs"
+          },
+          {
+            "name": "BenchmarkParquetRead/Size_10000",
+            "value": 818066,
+            "unit": "ns/op\t 1330006 B/op\t     693 allocs/op",
+            "extra": "1392 times\n4 procs"
+          },
+          {
+            "name": "BenchmarkParquetRead/Size_10000 - ns/op",
+            "value": 818066,
+            "unit": "ns/op",
+            "extra": "1392 times\n4 procs"
+          },
+          {
+            "name": "BenchmarkParquetRead/Size_10000 - B/op",
+            "value": 1330006,
+            "unit": "B/op",
+            "extra": "1392 times\n4 procs"
+          },
+          {
+            "name": "BenchmarkParquetRead/Size_10000 - allocs/op",
+            "value": 693,
+            "unit": "allocs/op",
+            "extra": "1392 times\n4 procs"
+          },
+          {
+            "name": "BenchmarkParquetRead/Size_10000",
+            "value": 813900,
+            "unit": "ns/op\t 1330100 B/op\t     693 allocs/op",
+            "extra": "1498 times\n4 procs"
+          },
+          {
+            "name": "BenchmarkParquetRead/Size_10000 - ns/op",
+            "value": 813900,
+            "unit": "ns/op",
+            "extra": "1498 times\n4 procs"
+          },
+          {
+            "name": "BenchmarkParquetRead/Size_10000 - B/op",
+            "value": 1330100,
+            "unit": "B/op",
+            "extra": "1498 times\n4 procs"
+          },
+          {
+            "name": "BenchmarkParquetRead/Size_10000 - allocs/op",
+            "value": 693,
+            "unit": "allocs/op",
+            "extra": "1498 times\n4 procs"
+          },
+          {
+            "name": "BenchmarkCSVWrite/Size_1000",
+            "value": 1710957,
+            "unit": "ns/op\t 1366106 B/op\t   13606 allocs/op",
+            "extra": "746 times\n4 procs"
+          },
+          {
+            "name": "BenchmarkCSVWrite/Size_1000 - ns/op",
+            "value": 1710957,
+            "unit": "ns/op",
+            "extra": "746 times\n4 procs"
+          },
+          {
+            "name": "BenchmarkCSVWrite/Size_1000 - B/op",
+            "value": 1366106,
+            "unit": "B/op",
+            "extra": "746 times\n4 procs"
+          },
+          {
+            "name": "BenchmarkCSVWrite/Size_1000 - allocs/op",
+            "value": 13606,
+            "unit": "allocs/op",
+            "extra": "746 times\n4 procs"
+          },
+          {
+            "name": "BenchmarkCSVWrite/Size_1000",
+            "value": 1621700,
+            "unit": "ns/op\t 1364802 B/op\t   13579 allocs/op",
+            "extra": "700 times\n4 procs"
+          },
+          {
+            "name": "BenchmarkCSVWrite/Size_1000 - ns/op",
+            "value": 1621700,
+            "unit": "ns/op",
+            "extra": "700 times\n4 procs"
+          },
+          {
+            "name": "BenchmarkCSVWrite/Size_1000 - B/op",
+            "value": 1364802,
+            "unit": "B/op",
+            "extra": "700 times\n4 procs"
+          },
+          {
+            "name": "BenchmarkCSVWrite/Size_1000 - allocs/op",
+            "value": 13579,
+            "unit": "allocs/op",
+            "extra": "700 times\n4 procs"
+          },
+          {
+            "name": "BenchmarkCSVWrite/Size_1000",
+            "value": 1608663,
+            "unit": "ns/op\t 1364610 B/op\t   13575 allocs/op",
+            "extra": "745 times\n4 procs"
+          },
+          {
+            "name": "BenchmarkCSVWrite/Size_1000 - ns/op",
+            "value": 1608663,
+            "unit": "ns/op",
+            "extra": "745 times\n4 procs"
+          },
+          {
+            "name": "BenchmarkCSVWrite/Size_1000 - B/op",
+            "value": 1364610,
+            "unit": "B/op",
+            "extra": "745 times\n4 procs"
+          },
+          {
+            "name": "BenchmarkCSVWrite/Size_1000 - allocs/op",
+            "value": 13575,
+            "unit": "allocs/op",
+            "extra": "745 times\n4 procs"
+          },
+          {
+            "name": "BenchmarkCSVWrite/Size_10000",
+            "value": 16888991,
+            "unit": "ns/op\t14360065 B/op\t  152233 allocs/op",
+            "extra": "69 times\n4 procs"
+          },
+          {
+            "name": "BenchmarkCSVWrite/Size_10000 - ns/op",
+            "value": 16888991,
+            "unit": "ns/op",
+            "extra": "69 times\n4 procs"
+          },
+          {
+            "name": "BenchmarkCSVWrite/Size_10000 - B/op",
+            "value": 14360065,
+            "unit": "B/op",
+            "extra": "69 times\n4 procs"
+          },
+          {
+            "name": "BenchmarkCSVWrite/Size_10000 - allocs/op",
+            "value": 152233,
+            "unit": "allocs/op",
+            "extra": "69 times\n4 procs"
+          },
+          {
+            "name": "BenchmarkCSVWrite/Size_10000",
+            "value": 16578627,
+            "unit": "ns/op\t14330873 B/op\t  151625 allocs/op",
+            "extra": "72 times\n4 procs"
+          },
+          {
+            "name": "BenchmarkCSVWrite/Size_10000 - ns/op",
+            "value": 16578627,
+            "unit": "ns/op",
+            "extra": "72 times\n4 procs"
+          },
+          {
+            "name": "BenchmarkCSVWrite/Size_10000 - B/op",
+            "value": 14330873,
+            "unit": "B/op",
+            "extra": "72 times\n4 procs"
+          },
+          {
+            "name": "BenchmarkCSVWrite/Size_10000 - allocs/op",
+            "value": 151625,
+            "unit": "allocs/op",
+            "extra": "72 times\n4 procs"
+          },
+          {
+            "name": "BenchmarkCSVWrite/Size_10000",
+            "value": 16654790,
+            "unit": "ns/op\t14366889 B/op\t  152375 allocs/op",
+            "extra": "70 times\n4 procs"
+          },
+          {
+            "name": "BenchmarkCSVWrite/Size_10000 - ns/op",
+            "value": 16654790,
+            "unit": "ns/op",
+            "extra": "70 times\n4 procs"
+          },
+          {
+            "name": "BenchmarkCSVWrite/Size_10000 - B/op",
+            "value": 14366889,
+            "unit": "B/op",
+            "extra": "70 times\n4 procs"
+          },
+          {
+            "name": "BenchmarkCSVWrite/Size_10000 - allocs/op",
+            "value": 152375,
+            "unit": "allocs/op",
+            "extra": "70 times\n4 procs"
+          },
+          {
+            "name": "BenchmarkMemoryUsage/Filter_Memory",
+            "value": 534498,
+            "unit": "ns/op\t  717617 B/op\t     133 allocs/op",
+            "extra": "2180 times\n4 procs"
+          },
+          {
+            "name": "BenchmarkMemoryUsage/Filter_Memory - ns/op",
+            "value": 534498,
+            "unit": "ns/op",
+            "extra": "2180 times\n4 procs"
+          },
+          {
+            "name": "BenchmarkMemoryUsage/Filter_Memory - B/op",
+            "value": 717617,
+            "unit": "B/op",
+            "extra": "2180 times\n4 procs"
+          },
+          {
+            "name": "BenchmarkMemoryUsage/Filter_Memory - allocs/op",
+            "value": 133,
+            "unit": "allocs/op",
+            "extra": "2180 times\n4 procs"
+          },
+          {
+            "name": "BenchmarkMemoryUsage/Filter_Memory",
+            "value": 539005,
+            "unit": "ns/op\t  717614 B/op\t     133 allocs/op",
+            "extra": "2113 times\n4 procs"
+          },
+          {
+            "name": "BenchmarkMemoryUsage/Filter_Memory - ns/op",
+            "value": 539005,
+            "unit": "ns/op",
+            "extra": "2113 times\n4 procs"
+          },
+          {
+            "name": "BenchmarkMemoryUsage/Filter_Memory - B/op",
+            "value": 717614,
+            "unit": "B/op",
+            "extra": "2113 times\n4 procs"
+          },
+          {
+            "name": "BenchmarkMemoryUsage/Filter_Memory - allocs/op",
+            "value": 133,
+            "unit": "allocs/op",
+            "extra": "2113 times\n4 procs"
+          },
+          {
+            "name": "BenchmarkMemoryUsage/Filter_Memory",
+            "value": 540087,
+            "unit": "ns/op\t  717611 B/op\t     133 allocs/op",
+            "extra": "2137 times\n4 procs"
+          },
+          {
+            "name": "BenchmarkMemoryUsage/Filter_Memory - ns/op",
+            "value": 540087,
+            "unit": "ns/op",
+            "extra": "2137 times\n4 procs"
+          },
+          {
+            "name": "BenchmarkMemoryUsage/Filter_Memory - B/op",
+            "value": 717611,
+            "unit": "B/op",
+            "extra": "2137 times\n4 procs"
+          },
+          {
+            "name": "BenchmarkMemoryUsage/Filter_Memory - allocs/op",
+            "value": 133,
+            "unit": "allocs/op",
+            "extra": "2137 times\n4 procs"
+          },
+          {
+            "name": "BenchmarkMemoryUsage/GroupBy_Memory",
+            "value": 536694,
+            "unit": "ns/op\t  259460 B/op\t     184 allocs/op",
+            "extra": "2107 times\n4 procs"
+          },
+          {
+            "name": "BenchmarkMemoryUsage/GroupBy_Memory - ns/op",
+            "value": 536694,
+            "unit": "ns/op",
+            "extra": "2107 times\n4 procs"
+          },
+          {
+            "name": "BenchmarkMemoryUsage/GroupBy_Memory - B/op",
+            "value": 259460,
+            "unit": "B/op",
+            "extra": "2107 times\n4 procs"
+          },
+          {
+            "name": "BenchmarkMemoryUsage/GroupBy_Memory - allocs/op",
+            "value": 184,
+            "unit": "allocs/op",
+            "extra": "2107 times\n4 procs"
+          },
+          {
+            "name": "BenchmarkMemoryUsage/GroupBy_Memory",
+            "value": 539640,
+            "unit": "ns/op\t  259460 B/op\t     184 allocs/op",
+            "extra": "2210 times\n4 procs"
+          },
+          {
+            "name": "BenchmarkMemoryUsage/GroupBy_Memory - ns/op",
+            "value": 539640,
+            "unit": "ns/op",
+            "extra": "2210 times\n4 procs"
+          },
+          {
+            "name": "BenchmarkMemoryUsage/GroupBy_Memory - B/op",
+            "value": 259460,
+            "unit": "B/op",
+            "extra": "2210 times\n4 procs"
+          },
+          {
+            "name": "BenchmarkMemoryUsage/GroupBy_Memory - allocs/op",
+            "value": 184,
+            "unit": "allocs/op",
+            "extra": "2210 times\n4 procs"
+          },
+          {
+            "name": "BenchmarkMemoryUsage/GroupBy_Memory",
+            "value": 542258,
+            "unit": "ns/op\t  259460 B/op\t     184 allocs/op",
+            "extra": "2181 times\n4 procs"
+          },
+          {
+            "name": "BenchmarkMemoryUsage/GroupBy_Memory - ns/op",
+            "value": 542258,
+            "unit": "ns/op",
+            "extra": "2181 times\n4 procs"
+          },
+          {
+            "name": "BenchmarkMemoryUsage/GroupBy_Memory - B/op",
+            "value": 259460,
+            "unit": "B/op",
+            "extra": "2181 times\n4 procs"
+          },
+          {
+            "name": "BenchmarkMemoryUsage/GroupBy_Memory - allocs/op",
+            "value": 184,
+            "unit": "allocs/op",
+            "extra": "2181 times\n4 procs"
           }
         ]
       }
