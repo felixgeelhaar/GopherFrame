@@ -4,6 +4,8 @@
 package gopherframe
 
 import (
+	"fmt"
+
 	"github.com/apache/arrow-go/v18/arrow"
 	"github.com/felixgeelhaar/GopherFrame/pkg/core"
 	"github.com/felixgeelhaar/GopherFrame/pkg/expr"
@@ -204,4 +206,49 @@ func By(column string, ascending bool) SortKey {
 		Column:    column,
 		Ascending: ascending,
 	}
+}
+
+// InnerJoin performs an inner join with another DataFrame.
+// Returns rows that have matching values in both DataFrames.
+// Example: df.InnerJoin(other, "user_id", "id")
+func (df *DataFrame) InnerJoin(other *DataFrame, leftKey, rightKey string) *DataFrame {
+	if df.err != nil {
+		return &DataFrame{err: df.err}
+	}
+	if other == nil {
+		return &DataFrame{err: fmt.Errorf("other DataFrame cannot be nil")}
+	}
+	if other.err != nil {
+		return &DataFrame{err: other.err}
+	}
+
+	joinedCoreDF, err := df.coreDF.InnerJoin(other.coreDF, leftKey, rightKey)
+	if err != nil {
+		return &DataFrame{err: err}
+	}
+
+	return &DataFrame{coreDF: joinedCoreDF}
+}
+
+// LeftJoin performs a left join with another DataFrame.
+// Returns all rows from the left DataFrame, and matching rows from the right DataFrame.
+// Non-matching rows from the right will have null values.
+// Example: df.LeftJoin(other, "user_id", "id")
+func (df *DataFrame) LeftJoin(other *DataFrame, leftKey, rightKey string) *DataFrame {
+	if df.err != nil {
+		return &DataFrame{err: df.err}
+	}
+	if other == nil {
+		return &DataFrame{err: fmt.Errorf("other DataFrame cannot be nil")}
+	}
+	if other.err != nil {
+		return &DataFrame{err: other.err}
+	}
+
+	joinedCoreDF, err := df.coreDF.LeftJoin(other.coreDF, leftKey, rightKey)
+	if err != nil {
+		return &DataFrame{err: err}
+	}
+
+	return &DataFrame{coreDF: joinedCoreDF}
 }

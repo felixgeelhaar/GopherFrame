@@ -815,3 +815,334 @@ func (r *singleRecordReader) Err() error {
 func (r *singleRecordReader) Close() error {
 	return nil // No resources to clean up
 }
+
+// JoinType represents the type of join operation
+type JoinType int
+
+const (
+	InnerJoin JoinType = iota
+	LeftJoin
+)
+
+// Join performs a join operation between this DataFrame and another DataFrame.
+// Uses hash join algorithm for efficient processing.
+func (df *DataFrame) Join(other *DataFrame, leftKey, rightKey string, joinType JoinType) (*DataFrame, error) {
+	if other == nil {
+		return nil, fmt.Errorf("other DataFrame cannot be nil")
+	}
+
+	// Validate join keys exist
+	if !df.HasColumn(leftKey) {
+		return nil, fmt.Errorf("left join key column not found: %s", leftKey)
+	}
+	if !other.HasColumn(rightKey) {
+		return nil, fmt.Errorf("right join key column not found: %s", rightKey)
+	}
+
+	// Get join key arrays
+	leftKeyArray := df.record.Column(df.getColumnIndex(leftKey))
+	rightKeyArray := other.record.Column(other.getColumnIndex(rightKey))
+
+	// Perform the join based on type
+	switch joinType {
+	case InnerJoin:
+		return df.performInnerJoin(other, leftKey, rightKey, leftKeyArray, rightKeyArray)
+	case LeftJoin:
+		return df.performLeftJoin(other, leftKey, rightKey, leftKeyArray, rightKeyArray)
+	default:
+		return nil, fmt.Errorf("unsupported join type: %d", joinType)
+	}
+}
+
+// InnerJoin is a convenience method for inner joins
+func (df *DataFrame) InnerJoin(other *DataFrame, leftKey, rightKey string) (*DataFrame, error) {
+	return df.Join(other, leftKey, rightKey, InnerJoin)
+}
+
+// LeftJoin is a convenience method for left joins
+func (df *DataFrame) LeftJoin(other *DataFrame, leftKey, rightKey string) (*DataFrame, error) {
+	return df.Join(other, leftKey, rightKey, LeftJoin)
+}
+
+// getColumnIndex returns the index of a column by name
+func (df *DataFrame) getColumnIndex(columnName string) int {
+	schema := df.record.Schema()
+	for i, field := range schema.Fields() {
+		if field.Name == columnName {
+			return i
+		}
+	}
+	return -1
+}
+
+// performInnerJoin implements the inner join logic
+func (df *DataFrame) performInnerJoin(other *DataFrame, leftKey, rightKey string, leftKeyArray, rightKeyArray arrow.Array) (*DataFrame, error) {
+	// Build hash map from right DataFrame for efficient lookups
+	rightHashMap := make(map[interface{}][]int)
+
+	// Populate hash map with right side values
+	for i := 0; i < rightKeyArray.Len(); i++ {
+		if rightKeyArray.IsNull(i) {
+			continue // Skip null values in joins
+		}
+
+		key := extractValue(rightKeyArray, i)
+		if key != nil {
+			rightHashMap[key] = append(rightHashMap[key], i)
+		}
+	}
+
+	// Find matching rows
+	var leftIndices, rightIndices []int
+	for i := 0; i < leftKeyArray.Len(); i++ {
+		if leftKeyArray.IsNull(i) {
+			continue // Skip null values
+		}
+
+		leftValue := extractValue(leftKeyArray, i)
+		if leftValue == nil {
+			continue
+		}
+
+		if rightRows, exists := rightHashMap[leftValue]; exists {
+			for _, rightRow := range rightRows {
+				leftIndices = append(leftIndices, i)
+				rightIndices = append(rightIndices, rightRow)
+			}
+		}
+	}
+
+	return df.buildJoinResult(other, leftKey, rightKey, leftIndices, rightIndices, false)
+}
+
+// performLeftJoin implements the left join logic
+func (df *DataFrame) performLeftJoin(other *DataFrame, leftKey, rightKey string, leftKeyArray, rightKeyArray arrow.Array) (*DataFrame, error) {
+	// Build hash map from right DataFrame
+	rightHashMap := make(map[interface{}][]int)
+
+	for i := 0; i < rightKeyArray.Len(); i++ {
+		if rightKeyArray.IsNull(i) {
+			continue
+		}
+
+		key := extractValue(rightKeyArray, i)
+		if key != nil {
+			rightHashMap[key] = append(rightHashMap[key], i)
+		}
+	}
+
+	// Find matching rows, including unmatched left rows
+	var leftIndices, rightIndices []int
+	for i := 0; i < leftKeyArray.Len(); i++ {
+		if leftKeyArray.IsNull(i) {
+			// Include left row with null values for right side
+			leftIndices = append(leftIndices, i)
+			rightIndices = append(rightIndices, -1) // -1 indicates no match
+			continue
+		}
+
+		leftValue := extractValue(leftKeyArray, i)
+		if leftValue == nil {
+			leftIndices = append(leftIndices, i)
+			rightIndices = append(rightIndices, -1)
+			continue
+		}
+
+		if rightRows, exists := rightHashMap[leftValue]; exists {
+			for _, rightRow := range rightRows {
+				leftIndices = append(leftIndices, i)
+				rightIndices = append(rightIndices, rightRow)
+			}
+		} else {
+			// No match found, include left row with nulls for right side
+			leftIndices = append(leftIndices, i)
+			rightIndices = append(rightIndices, -1)
+		}
+	}
+
+	return df.buildJoinResult(other, leftKey, rightKey, leftIndices, rightIndices, true)
+}
+
+// extractValue extracts a comparable value from an Arrow array at given index
+func extractValue(arr arrow.Array, index int) interface{} {
+	switch typedArr := arr.(type) {
+	case *array.Int64:
+		return typedArr.Value(index)
+	case *array.Float64:
+		return typedArr.Value(index)
+	case *array.String:
+		return typedArr.Value(index)
+	case *array.Boolean:
+		return typedArr.Value(index)
+	default:
+		// For other types, convert to string representation
+		return fmt.Sprintf("%v", arr.GetOneForMarshal(index))
+	}
+}
+
+// buildJoinResult constructs the final joined DataFrame
+func (df *DataFrame) buildJoinResult(other *DataFrame, leftKey, rightKey string, leftIndices, rightIndices []int, isLeftJoin bool) (*DataFrame, error) {
+	if len(leftIndices) != len(rightIndices) {
+		return nil, fmt.Errorf("internal error: index arrays length mismatch")
+	}
+
+	leftSchema := df.record.Schema()
+	rightSchema := other.record.Schema()
+
+	// Build result schema, avoiding duplicate column names
+	var resultFields []arrow.Field
+	columnNameMap := make(map[string]bool)
+
+	// Add all left columns
+	for _, field := range leftSchema.Fields() {
+		resultFields = append(resultFields, field)
+		columnNameMap[field.Name] = true
+	}
+
+	// Add right columns, skipping the join key and handling name conflicts
+	for _, field := range rightSchema.Fields() {
+		if field.Name == rightKey {
+			continue // Skip right join key to avoid duplication
+		}
+
+		fieldName := field.Name
+		if columnNameMap[fieldName] {
+			fieldName = "right_" + fieldName // Prefix to avoid conflicts
+		}
+
+		resultFields = append(resultFields, arrow.Field{
+			Name: fieldName,
+			Type: field.Type,
+		})
+		columnNameMap[fieldName] = true
+	}
+
+	resultSchema := arrow.NewSchema(resultFields, nil)
+
+	// Build result arrays
+	resultArrays := make([]arrow.Array, len(resultFields))
+	pool := memory.NewGoAllocator()
+
+	fieldIndex := 0
+
+	// Process left columns
+	for i, field := range leftSchema.Fields() {
+		resultArrays[fieldIndex] = df.buildJoinedArray(pool, df.record.Column(i), leftIndices, field.Type, false, int(df.record.NumRows()))
+		fieldIndex++
+	}
+
+	// Process right columns (excluding join key)
+	for i, field := range rightSchema.Fields() {
+		if field.Name == rightKey {
+			continue
+		}
+
+		resultArrays[fieldIndex] = df.buildJoinedArray(pool, other.record.Column(i), rightIndices, field.Type, isLeftJoin, int(other.record.NumRows()))
+		fieldIndex++
+	}
+
+	// Create result record
+	resultRecord := array.NewRecord(resultSchema, resultArrays, int64(len(leftIndices)))
+
+	// Release arrays as they're now owned by the record
+	for _, arr := range resultArrays {
+		arr.Release()
+	}
+
+	return NewDataFrame(resultRecord), nil
+}
+
+// buildJoinedArray creates an array for the join result based on the provided indices
+func (df *DataFrame) buildJoinedArray(pool memory.Allocator, sourceArray arrow.Array, indices []int, dataType arrow.DataType, allowNulls bool, sourceLength int) arrow.Array {
+	switch dataType.ID() {
+	case arrow.INT64:
+		builder := array.NewInt64Builder(pool)
+		defer builder.Release()
+
+		sourceTyped := sourceArray.(*array.Int64)
+		for _, idx := range indices {
+			if idx == -1 && allowNulls {
+				builder.AppendNull()
+			} else if idx >= 0 && idx < sourceLength {
+				if sourceTyped.IsNull(idx) {
+					builder.AppendNull()
+				} else {
+					builder.Append(sourceTyped.Value(idx))
+				}
+			} else {
+				builder.AppendNull()
+			}
+		}
+		return builder.NewArray()
+
+	case arrow.FLOAT64:
+		builder := array.NewFloat64Builder(pool)
+		defer builder.Release()
+
+		sourceTyped := sourceArray.(*array.Float64)
+		for _, idx := range indices {
+			if idx == -1 && allowNulls {
+				builder.AppendNull()
+			} else if idx >= 0 && idx < sourceLength {
+				if sourceTyped.IsNull(idx) {
+					builder.AppendNull()
+				} else {
+					builder.Append(sourceTyped.Value(idx))
+				}
+			} else {
+				builder.AppendNull()
+			}
+		}
+		return builder.NewArray()
+
+	case arrow.STRING:
+		builder := array.NewStringBuilder(pool)
+		defer builder.Release()
+
+		sourceTyped := sourceArray.(*array.String)
+		for _, idx := range indices {
+			if idx == -1 && allowNulls {
+				builder.AppendNull()
+			} else if idx >= 0 && idx < sourceLength {
+				if sourceTyped.IsNull(idx) {
+					builder.AppendNull()
+				} else {
+					builder.Append(sourceTyped.Value(idx))
+				}
+			} else {
+				builder.AppendNull()
+			}
+		}
+		return builder.NewArray()
+
+	case arrow.BOOL:
+		builder := array.NewBooleanBuilder(pool)
+		defer builder.Release()
+
+		sourceTyped := sourceArray.(*array.Boolean)
+		for _, idx := range indices {
+			if idx == -1 && allowNulls {
+				builder.AppendNull()
+			} else if idx >= 0 && idx < sourceLength {
+				if sourceTyped.IsNull(idx) {
+					builder.AppendNull()
+				} else {
+					builder.Append(sourceTyped.Value(idx))
+				}
+			} else {
+				builder.AppendNull()
+			}
+		}
+		return builder.NewArray()
+
+	default:
+		// For unsupported types, create a null array
+		builder := array.NewNullBuilder(pool)
+		defer builder.Release()
+
+		for range indices {
+			builder.AppendNull()
+		}
+		return builder.NewArray()
+	}
+}
