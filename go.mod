@@ -7,7 +7,6 @@ toolchain go1.24.4
 require (
 	github.com/apache/arrow-go/v18 v18.0.0
 	github.com/go-gota/gota v0.12.0
-	github.com/gorilla/mux v1.8.1
 	github.com/leanovate/gopter v0.2.11
 	github.com/stretchr/testify v1.9.0
 )

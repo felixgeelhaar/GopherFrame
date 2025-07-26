@@ -28,17 +28,17 @@ func generateTestDataCSV(filename string, rows int) error {
 	f.WriteString("id,name,age,salary,department,active\n")
 
 	// Generate consistent test data
-	rand.Seed(42) // Fixed seed for reproducible results
+	rng := rand.New(rand.NewSource(42)) // Fixed seed for reproducible results
 	departments := []string{"Engineering", "Sales", "Marketing", "HR", "Operations"}
 
 	for i := 0; i < rows; i++ {
 		f.WriteString(fmt.Sprintf("%d,Employee_%d,%d,%.2f,%s,%t\n",
 			i,
 			i,
-			20+rand.Intn(45),            // age 20-65
-			30000+rand.Float64()*120000, // salary 30k-150k
-			departments[rand.Intn(len(departments))],
-			rand.Float64() > 0.1, // 90% active
+			20+rng.Intn(45),            // age 20-65
+			30000+rng.Float64()*120000, // salary 30k-150k
+			departments[rng.Intn(len(departments))],
+			rng.Float64() > 0.1, // 90% active
 		))
 	}
 
@@ -321,7 +321,7 @@ func BenchmarkComparativeAnalysis(b *testing.B) {
 }
 
 // Example usage comparison for documentation
-func ExamplePerformanceComparison() {
+func ExampleComparison() {
 	// GopherFrame approach
 	df, _ := ReadCSV("data.csv")
 	defer df.Release()

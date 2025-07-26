@@ -297,7 +297,7 @@ func (writer *EnhancedCSVWriter) getSuggestedFormat(dataType arrow.DataType) str
 // EstimateCSVSize estimates the output size of a DataFrame when written to CSV
 func (writer *EnhancedCSVWriter) EstimateCSVSize(df *core.DataFrame) (int64, error) {
 	schema := df.Schema()
-	numRows := int64(df.NumRows())
+	numRows := df.NumRows()
 	numCols := int64(len(schema.Fields()))
 
 	if numRows == 0 {
