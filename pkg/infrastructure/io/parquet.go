@@ -103,6 +103,19 @@ func (r *ParquetReader) ReadFile(filename string) (*dataframe.DataFrame, error) 
 				builder := array.NewBooleanBuilder(pool)
 				emptyArrays[i] = builder.NewArray()
 				builder.Release()
+			case arrow.DATE32:
+				builder := array.NewDate32Builder(pool)
+				emptyArrays[i] = builder.NewArray()
+				builder.Release()
+			case arrow.DATE64:
+				builder := array.NewDate64Builder(pool)
+				emptyArrays[i] = builder.NewArray()
+				builder.Release()
+			case arrow.TIMESTAMP:
+				timestampType := field.Type.(*arrow.TimestampType)
+				builder := array.NewTimestampBuilder(pool, timestampType)
+				emptyArrays[i] = builder.NewArray()
+				builder.Release()
 			default:
 				return nil, fmt.Errorf("unsupported data type for empty table: %s", field.Type)
 			}
