@@ -56,7 +56,7 @@ func (b *Backend) Read(ctx context.Context, source string, opts storage.ReadOpti
 	}
 
 	// Open the file
-	file, err := os.Open(source)
+	file, err := os.Open(filepath.Clean(source))
 	if err != nil {
 		if os.IsNotExist(err) {
 			return nil, storage.ErrSourceNotFound
@@ -105,7 +105,7 @@ func (b *Backend) Write(ctx context.Context, destination string, records storage
 	}
 
 	// Create the file
-	file, err := os.Create(destination)
+	file, err := os.Create(filepath.Clean(destination))
 	if err != nil {
 		return fmt.Errorf("failed to create Arrow file: %w", err)
 	}
@@ -187,7 +187,7 @@ func (b *Backend) Scan(ctx context.Context, pattern string) ([]storage.SourceInf
 // Schema implements storage.Backend.Schema for Arrow files.
 func (b *Backend) Schema(_ context.Context, source string) (*arrow.Schema, error) {
 	// Open the file
-	file, err := os.Open(source)
+	file, err := os.Open(filepath.Clean(source))
 	if err != nil {
 		if os.IsNotExist(err) {
 			return nil, storage.ErrSourceNotFound

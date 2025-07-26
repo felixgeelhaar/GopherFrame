@@ -51,7 +51,7 @@ func (r *ParquetReader) ReadFile(filename string) (*dataframe.DataFrame, error) 
 	}
 
 	// Open the Parquet file
-	f, err := os.Open(filename)
+	f, err := os.Open(filepath.Clean(filename))
 	if err != nil {
 		return nil, fmt.Errorf("failed to open Parquet file: %w", err)
 	}
@@ -103,6 +103,19 @@ func (r *ParquetReader) ReadFile(filename string) (*dataframe.DataFrame, error) 
 				builder := array.NewBooleanBuilder(pool)
 				emptyArrays[i] = builder.NewArray()
 				builder.Release()
+			case arrow.DATE32:
+				builder := array.NewDate32Builder(pool)
+				emptyArrays[i] = builder.NewArray()
+				builder.Release()
+			case arrow.DATE64:
+				builder := array.NewDate64Builder(pool)
+				emptyArrays[i] = builder.NewArray()
+				builder.Release()
+			case arrow.TIMESTAMP:
+				timestampType := field.Type.(*arrow.TimestampType)
+				builder := array.NewTimestampBuilder(pool, timestampType)
+				emptyArrays[i] = builder.NewArray()
+				builder.Release()
 			default:
 				return nil, fmt.Errorf("unsupported data type for empty table: %s", field.Type)
 			}
@@ -145,7 +158,7 @@ func (w *ParquetWriter) WriteFile(df *dataframe.DataFrame, filename string) erro
 	}
 
 	// Create the output file
-	f, err := os.Create(filename)
+	f, err := os.Create(filepath.Clean(filename))
 	if err != nil {
 		return fmt.Errorf("failed to create output file: %w", err)
 	}
