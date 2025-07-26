@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 
@@ -148,7 +149,7 @@ func (reader *EnhancedCSVReader) ReadCSVWithDates(filePath string, pool memory.A
 		return nil, fmt.Errorf("invalid file path: %w", err)
 	}
 
-	file, err := os.Open(filePath)
+	file, err := os.Open(filepath.Clean(filePath))
 	if err != nil {
 		return nil, fmt.Errorf("failed to open file: %w", err)
 	}

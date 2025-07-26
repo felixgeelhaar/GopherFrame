@@ -1195,7 +1195,11 @@ func (u *UnaryExpr) evaluateYear(operand arrow.Array) (arrow.Array, error) {
 				// Date32 is days since Unix epoch
 				days := dateArray.Value(i)
 				t := time.Unix(int64(days)*86400, 0).UTC()
-				builder.Append(int32(t.Year()))
+				year := t.Year()
+				if year < -2147483648 || year > 2147483647 {
+					return nil, fmt.Errorf("year %d out of int32 range", year)
+				}
+				builder.Append(int32(year))
 			}
 		}
 	case arrow.DATE64:
@@ -1207,7 +1211,11 @@ func (u *UnaryExpr) evaluateYear(operand arrow.Array) (arrow.Array, error) {
 				// Date64 is milliseconds since Unix epoch
 				ms := int64(dateArray.Value(i))
 				t := time.Unix(ms/1000, (ms%1000)*1000000).UTC()
-				builder.Append(int32(t.Year()))
+				year := t.Year()
+				if year < -2147483648 || year > 2147483647 {
+					return nil, fmt.Errorf("year %d out of int32 range", year)
+				}
+				builder.Append(int32(year))
 			}
 		}
 	case arrow.TIMESTAMP:
@@ -1218,7 +1226,11 @@ func (u *UnaryExpr) evaluateYear(operand arrow.Array) (arrow.Array, error) {
 			} else {
 				ts := int64(timestampArray.Value(i))
 				t := time.Unix(ts/1000000, (ts%1000000)*1000).UTC()
-				builder.Append(int32(t.Year()))
+				year := t.Year()
+				if year < -2147483648 || year > 2147483647 {
+					return nil, fmt.Errorf("year %d out of int32 range", year)
+				}
+				builder.Append(int32(year))
 			}
 		}
 	default:

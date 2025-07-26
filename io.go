@@ -46,7 +46,7 @@ func ReadParquet(filename string) (*DataFrame, error) {
 	}
 
 	// Open the Parquet file
-	f, err := os.Open(filename)
+	f, err := os.Open(filepath.Clean(filename))
 	if err != nil {
 		return nil, fmt.Errorf("failed to open Parquet file: %w", err)
 	}
@@ -100,7 +100,7 @@ func WriteParquet(df *DataFrame, filename string) error {
 	}
 
 	// Create the output file
-	f, err := os.Create(filename)
+	f, err := os.Create(filepath.Clean(filename))
 	if err != nil {
 		return fmt.Errorf("failed to create output file: %w", err)
 	}
@@ -239,7 +239,7 @@ func WriteCSV(df *DataFrame, filename string) error {
 	}
 
 	// Create the output file
-	f, err := os.Create(filename)
+	f, err := os.Create(filepath.Clean(filename))
 	if err != nil {
 		return fmt.Errorf("failed to create CSV file: %w", err)
 	}
@@ -317,7 +317,7 @@ func ReadArrowIPC(filename string) (*DataFrame, error) {
 	}
 
 	// Open the file
-	f, err := os.Open(filename)
+	f, err := os.Open(filepath.Clean(filename))
 	if err != nil {
 		return nil, fmt.Errorf("failed to open Arrow IPC file: %w", err)
 	}
@@ -358,7 +358,7 @@ func WriteArrowIPC(df *DataFrame, filename string) error {
 	}
 
 	// Create the output file
-	f, err := os.Create(filename)
+	f, err := os.Create(filepath.Clean(filename))
 	if err != nil {
 		return fmt.Errorf("failed to create output file: %w", err)
 	}
@@ -389,7 +389,7 @@ func WriteArrowIPC(df *DataFrame, filename string) error {
 // readCSVData reads and parses CSV file data
 func readCSVData(filename string) ([]string, [][]string, error) {
 	// Open the CSV file
-	f, err := os.Open(filename)
+	f, err := os.Open(filepath.Clean(filename))
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to open CSV file: %w", err)
 	}

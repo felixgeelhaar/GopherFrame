@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
 	"strconv"
 
 	"github.com/apache/arrow-go/v18/arrow"
@@ -37,7 +38,7 @@ func (writer *EnhancedCSVWriter) WriteCSVWithDates(df *core.DataFrame, filePath 
 		return fmt.Errorf("invalid file path: %w", err)
 	}
 
-	file, err := os.Create(filePath)
+	file, err := os.Create(filepath.Clean(filePath))
 	if err != nil {
 		return fmt.Errorf("failed to create file: %w", err)
 	}
@@ -183,7 +184,7 @@ func (writer *EnhancedCSVWriter) WriteCSVWithCustomFormats(df *core.DataFrame, f
 	originalDateFormat := writer.options.DateFormat
 	originalTimestampFormat := writer.options.TimestampFormat
 
-	file, err := os.Create(filePath)
+	file, err := os.Create(filepath.Clean(filePath))
 	if err != nil {
 		return fmt.Errorf("failed to create file: %w", err)
 	}

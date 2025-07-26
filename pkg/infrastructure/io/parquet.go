@@ -51,7 +51,7 @@ func (r *ParquetReader) ReadFile(filename string) (*dataframe.DataFrame, error) 
 	}
 
 	// Open the Parquet file
-	f, err := os.Open(filename)
+	f, err := os.Open(filepath.Clean(filename))
 	if err != nil {
 		return nil, fmt.Errorf("failed to open Parquet file: %w", err)
 	}
@@ -158,7 +158,7 @@ func (w *ParquetWriter) WriteFile(df *dataframe.DataFrame, filename string) erro
 	}
 
 	// Create the output file
-	f, err := os.Create(filename)
+	f, err := os.Create(filepath.Clean(filename))
 	if err != nil {
 		return fmt.Errorf("failed to create output file: %w", err)
 	}
