@@ -2,6 +2,7 @@ package gopherframe
 
 import (
 	"fmt"
+	"sort"
 	"testing"
 
 	"github.com/apache/arrow-go/v18/arrow"
@@ -16,7 +17,16 @@ func createTestDataFrame(pool memory.Allocator, data map[string]interface{}) *Da
 	var fields []arrow.Field
 	var arrays []arrow.Array
 
-	for colName, values := range data {
+	// Sort column names to ensure deterministic ordering
+	// (Go map iteration is randomized)
+	colNames := make([]string, 0, len(data))
+	for colName := range data {
+		colNames = append(colNames, colName)
+	}
+	sort.Strings(colNames)
+
+	for _, colName := range colNames {
+		values := data[colName]
 		switch v := values.(type) {
 		case []int64:
 			builder := array.NewInt64Builder(pool)
@@ -156,10 +166,21 @@ func TestLeftJoin_BasicFunctionality(t *testing.T) {
 	assert.Equal(t, int64(5), result.NumRows()) // All left rows + extra match for user 2
 	assert.Equal(t, int64(4), result.NumCols()) // user_id, name, product, amount
 
-	// Check that all users are present
+	// Check that all users are present - look up column by name
 	record := result.Record()
-	userIds := record.Column(0).(*array.Int64)
+	actualCols := result.ColumnNames()
 
+	// Find user_id column index
+	userIdIdx := -1
+	for i, colName := range actualCols {
+		if colName == "user_id" {
+			userIdIdx = i
+			break
+		}
+	}
+	require.NotEqual(t, -1, userIdIdx, "user_id column not found")
+
+	userIds := record.Column(userIdIdx).(*array.Int64)
 	// Should have: 1, 2, 2, 3, 4 (user 2 appears twice due to multiple orders)
 	expectedUserIds := []int64{1, 2, 2, 3, 4}
 	for i, expected := range expectedUserIds {
@@ -169,13 +190,13 @@ func TestLeftJoin_BasicFunctionality(t *testing.T) {
 	// Check that unmatched rows have null values
 	// Find the product column index
 	productIdx := -1
-	actualCols := result.ColumnNames()
 	for i, colName := range actualCols {
 		if colName == "product" {
 			productIdx = i
 			break
 		}
 	}
+	require.NotEqual(t, -1, productIdx, "product column not found")
 
 	products := record.Column(productIdx).(*array.String)
 	assert.False(t, products.IsNull(0)) // Alice has product

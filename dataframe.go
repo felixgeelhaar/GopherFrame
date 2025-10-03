@@ -31,6 +31,7 @@ func (df *DataFrame) NumRows() int64 {
 	if df.err != nil || df.coreDF == nil {
 		return 0
 	}
+
 	return df.coreDF.NumRows()
 }
 

@@ -6,9 +6,9 @@ GopherFrame is an Apache Arrow-backed DataFrame library designed from the ground
 
 ## Project Status
 
-🚧 **Early Development** - Target v0.1 release: Q1 2025
+🔄 **v0.1-beta** - Active Development
 
-This is a greenfield project currently in active development. The API is not stable and breaking changes are expected.
+Core features are implemented and stable. Advanced features (joins, string operations) are functional but undergoing refinement. API may change before v1.0.
 
 ## Vision
 
@@ -21,15 +21,25 @@ Empower Go developers to build fast, reliable, and scalable data engineering pip
 - **Idiomatic Go**: Strongly-typed API using generics, explicit error handling, composable design
 - **No Compromises**: Real algorithms, real data, real performance from day one
 
-## Planned Features (v0.1 MVP)
+## Implemented Features (v0.1-beta)
 
-- **Core DataFrame/Series**: Immutable, strongly-typed structures backed by Arrow
-- **High-Performance I/O**: Concurrent Parquet, CSV, and Arrow IPC readers/writers
+### ✅ Core Functionality
+- **DataFrame/Series**: Immutable, strongly-typed structures backed by Apache Arrow
+- **High-Performance I/O**: Parquet, CSV, and Arrow IPC readers/writers with concurrency
 - **Expression Engine**: Lazy evaluation with chainable operations
-- **Data Transformations**: Selection, filtering, column operations, sorting
-- **Aggregations**: GroupBy operations with multiple aggregation functions
+- **Data Transformations**:
+  - Selection (`Select`, `Drop`)
+  - Filtering (`Filter` with complex predicates)
+  - Column operations (`WithColumn`)
+  - Sorting (single and multi-column)
+- **Aggregations**: GroupBy with Sum, Mean, Min, Max, Count, StdDev
 
-### Example Usage (Planned API)
+### 🧪 Experimental Features
+- **Join Operations**: InnerJoin, LeftJoin (functional, under refinement)
+- **String Operations**: Contains, StartsWith, EndsWith
+- **Storage Abstraction**: Pluggable backend system
+
+### Example Usage
 
 ```go
 package main
