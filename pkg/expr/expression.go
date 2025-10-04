@@ -6,6 +6,7 @@ package expr
 import (
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/apache/arrow-go/v18/arrow"
 	"github.com/apache/arrow-go/v18/arrow/array"
@@ -37,6 +38,22 @@ type Expr interface {
 	Contains(substring Expr) Expr
 	StartsWith(prefix Expr) Expr
 	EndsWith(suffix Expr) Expr
+
+	// Temporal methods
+	Year() Expr
+	Month() Expr
+	Day() Expr
+	Hour() Expr
+	Minute() Expr
+	Second() Expr
+	TruncateToYear() Expr
+	TruncateToMonth() Expr
+	TruncateToDay() Expr
+	TruncateToHour() Expr
+	AddDays(days Expr) Expr
+	AddHours(hours Expr) Expr
+	AddMinutes(minutes Expr) Expr
+	AddSeconds(seconds Expr) Expr
 }
 
 // ColumnExpr represents a reference to an existing column.
@@ -125,6 +142,78 @@ func (c *ColumnExpr) StartsWith(prefix Expr) Expr {
 // EndsWith creates a binary expression that tests if this string column ends with a suffix.
 func (c *ColumnExpr) EndsWith(suffix Expr) Expr {
 	return NewBinaryExpr(c, suffix, "ends_with")
+}
+
+// Temporal operations for ColumnExpr
+
+// Year extracts the year component from a timestamp column.
+func (c *ColumnExpr) Year() Expr {
+	return NewUnaryExpr(c, "year")
+}
+
+// Month extracts the month component (1-12) from a timestamp column.
+func (c *ColumnExpr) Month() Expr {
+	return NewUnaryExpr(c, "month")
+}
+
+// Day extracts the day component (1-31) from a timestamp column.
+func (c *ColumnExpr) Day() Expr {
+	return NewUnaryExpr(c, "day")
+}
+
+// Hour extracts the hour component (0-23) from a timestamp column.
+func (c *ColumnExpr) Hour() Expr {
+	return NewUnaryExpr(c, "hour")
+}
+
+// Minute extracts the minute component (0-59) from a timestamp column.
+func (c *ColumnExpr) Minute() Expr {
+	return NewUnaryExpr(c, "minute")
+}
+
+// Second extracts the second component (0-59) from a timestamp column.
+func (c *ColumnExpr) Second() Expr {
+	return NewUnaryExpr(c, "second")
+}
+
+// TruncateToYear truncates timestamp to the start of the year.
+func (c *ColumnExpr) TruncateToYear() Expr {
+	return NewUnaryExpr(c, "trunc_year")
+}
+
+// TruncateToMonth truncates timestamp to the start of the month.
+func (c *ColumnExpr) TruncateToMonth() Expr {
+	return NewUnaryExpr(c, "trunc_month")
+}
+
+// TruncateToDay truncates timestamp to the start of the day.
+func (c *ColumnExpr) TruncateToDay() Expr {
+	return NewUnaryExpr(c, "trunc_day")
+}
+
+// TruncateToHour truncates timestamp to the start of the hour.
+func (c *ColumnExpr) TruncateToHour() Expr {
+	return NewUnaryExpr(c, "trunc_hour")
+}
+
+// AddDays adds a number of days to a timestamp column.
+func (c *ColumnExpr) AddDays(days Expr) Expr {
+	return NewBinaryExpr(c, days, "add_days")
+}
+
+// AddHours adds a number of hours to a timestamp column.
+func (c *ColumnExpr) AddHours(hours Expr) Expr {
+	return NewBinaryExpr(c, hours, "add_hours")
+}
+
+// AddMinutes adds a number of minutes to a timestamp column.
+func (c *ColumnExpr) AddMinutes(minutes Expr) Expr {
+	return NewBinaryExpr(c, minutes, "add_minutes")
+}
+
+// AddSeconds adds a number of seconds to a timestamp column.
+func (c *ColumnExpr) AddSeconds(seconds Expr) Expr {
+	return NewBinaryExpr(c, seconds, "add_seconds")
 }
 
 // LiteralExpr represents a literal value.
@@ -277,6 +366,63 @@ func (l *LiteralExpr) EndsWith(suffix Expr) Expr {
 	return NewBinaryExpr(l, suffix, "ends_with")
 }
 
+// Temporal methods for literals
+func (l *LiteralExpr) Year() Expr {
+	return NewUnaryExpr(l, "year")
+}
+
+func (l *LiteralExpr) Month() Expr {
+	return NewUnaryExpr(l, "month")
+}
+
+func (l *LiteralExpr) Day() Expr {
+	return NewUnaryExpr(l, "day")
+}
+
+func (l *LiteralExpr) Hour() Expr {
+	return NewUnaryExpr(l, "hour")
+}
+
+func (l *LiteralExpr) Minute() Expr {
+	return NewUnaryExpr(l, "minute")
+}
+
+func (l *LiteralExpr) Second() Expr {
+	return NewUnaryExpr(l, "second")
+}
+
+func (l *LiteralExpr) TruncateToYear() Expr {
+	return NewUnaryExpr(l, "trunc_year")
+}
+
+func (l *LiteralExpr) TruncateToMonth() Expr {
+	return NewUnaryExpr(l, "trunc_month")
+}
+
+func (l *LiteralExpr) TruncateToDay() Expr {
+	return NewUnaryExpr(l, "trunc_day")
+}
+
+func (l *LiteralExpr) TruncateToHour() Expr {
+	return NewUnaryExpr(l, "trunc_hour")
+}
+
+func (l *LiteralExpr) AddDays(days Expr) Expr {
+	return NewBinaryExpr(l, days, "add_days")
+}
+
+func (l *LiteralExpr) AddHours(hours Expr) Expr {
+	return NewBinaryExpr(l, hours, "add_hours")
+}
+
+func (l *LiteralExpr) AddMinutes(minutes Expr) Expr {
+	return NewBinaryExpr(l, minutes, "add_minutes")
+}
+
+func (l *LiteralExpr) AddSeconds(seconds Expr) Expr {
+	return NewBinaryExpr(l, seconds, "add_seconds")
+}
+
 // BinaryExpr represents binary operations between two expressions.
 type BinaryExpr struct {
 	left     Expr
@@ -330,6 +476,14 @@ func (b *BinaryExpr) Evaluate(df *core.DataFrame) (arrow.Array, error) {
 		return b.evaluateStartsWith(leftArray, rightArray)
 	case "ends_with":
 		return b.evaluateEndsWith(leftArray, rightArray)
+	case "add_days":
+		return b.evaluateAddDays(leftArray, rightArray)
+	case "add_hours":
+		return b.evaluateAddHours(leftArray, rightArray)
+	case "add_minutes":
+		return b.evaluateAddMinutes(leftArray, rightArray)
+	case "add_seconds":
+		return b.evaluateAddSeconds(leftArray, rightArray)
 	default:
 		return nil, fmt.Errorf("unsupported binary operator: %s", b.operator)
 	}
@@ -724,6 +878,63 @@ func (b *BinaryExpr) EndsWith(suffix Expr) Expr {
 	return NewBinaryExpr(b, suffix, "ends_with")
 }
 
+// Temporal methods for binary expressions
+func (b *BinaryExpr) Year() Expr {
+	return NewUnaryExpr(b, "year")
+}
+
+func (b *BinaryExpr) Month() Expr {
+	return NewUnaryExpr(b, "month")
+}
+
+func (b *BinaryExpr) Day() Expr {
+	return NewUnaryExpr(b, "day")
+}
+
+func (b *BinaryExpr) Hour() Expr {
+	return NewUnaryExpr(b, "hour")
+}
+
+func (b *BinaryExpr) Minute() Expr {
+	return NewUnaryExpr(b, "minute")
+}
+
+func (b *BinaryExpr) Second() Expr {
+	return NewUnaryExpr(b, "second")
+}
+
+func (b *BinaryExpr) TruncateToYear() Expr {
+	return NewUnaryExpr(b, "trunc_year")
+}
+
+func (b *BinaryExpr) TruncateToMonth() Expr {
+	return NewUnaryExpr(b, "trunc_month")
+}
+
+func (b *BinaryExpr) TruncateToDay() Expr {
+	return NewUnaryExpr(b, "trunc_day")
+}
+
+func (b *BinaryExpr) TruncateToHour() Expr {
+	return NewUnaryExpr(b, "trunc_hour")
+}
+
+func (b *BinaryExpr) AddDays(days Expr) Expr {
+	return NewBinaryExpr(b, days, "add_days")
+}
+
+func (b *BinaryExpr) AddHours(hours Expr) Expr {
+	return NewBinaryExpr(b, hours, "add_hours")
+}
+
+func (b *BinaryExpr) AddMinutes(minutes Expr) Expr {
+	return NewBinaryExpr(b, minutes, "add_minutes")
+}
+
+func (b *BinaryExpr) AddSeconds(seconds Expr) Expr {
+	return NewBinaryExpr(b, seconds, "add_seconds")
+}
+
 // evaluateContains implements string contains comparison
 func (b *BinaryExpr) evaluateContains(left, right arrow.Array) (arrow.Array, error) {
 	if left.Len() != right.Len() {
@@ -841,6 +1052,165 @@ func (b *BinaryExpr) evaluateEndsWith(left, right arrow.Array) (arrow.Array, err
 	return builder.NewArray(), nil
 }
 
+// UnaryExpr represents unary operations on a single expression.
+type UnaryExpr struct {
+	operand  Expr
+	operator string
+}
+
+// NewUnaryExpr creates a new unary expression.
+func NewUnaryExpr(operand Expr, operator string) Expr {
+	return &UnaryExpr{
+		operand:  operand,
+		operator: operator,
+	}
+}
+
+// Evaluate implements Expr.Evaluate for unary operations.
+func (u *UnaryExpr) Evaluate(df *core.DataFrame) (arrow.Array, error) {
+	// Evaluate operand
+	operandArray, err := u.operand.Evaluate(df)
+	if err != nil {
+		return nil, fmt.Errorf("failed to evaluate operand: %w", err)
+	}
+	defer operandArray.Release()
+
+	// Implement unary operations
+	switch u.operator {
+	case "year":
+		return u.evaluateYear(operandArray)
+	case "month":
+		return u.evaluateMonth(operandArray)
+	case "day":
+		return u.evaluateDay(operandArray)
+	case "hour":
+		return u.evaluateHour(operandArray)
+	case "minute":
+		return u.evaluateMinute(operandArray)
+	case "second":
+		return u.evaluateSecond(operandArray)
+	case "trunc_year":
+		return u.evaluateTruncateToYear(operandArray)
+	case "trunc_month":
+		return u.evaluateTruncateToMonth(operandArray)
+	case "trunc_day":
+		return u.evaluateTruncateToDay(operandArray)
+	case "trunc_hour":
+		return u.evaluateTruncateToHour(operandArray)
+	default:
+		return nil, fmt.Errorf("unsupported unary operator: %s", u.operator)
+	}
+}
+
+// Name implements Expr.Name for unary operations.
+func (u *UnaryExpr) Name() string {
+	return fmt.Sprintf("%s(%s)", u.operator, u.operand.Name())
+}
+
+// String implements Expr.String for unary operations.
+func (u *UnaryExpr) String() string {
+	return fmt.Sprintf("%s(%s)", u.operator, u.operand.String())
+}
+
+// Fluent methods for UnaryExpr (delegate to BinaryExpr)
+func (u *UnaryExpr) Add(other Expr) Expr {
+	return NewBinaryExpr(u, other, "add")
+}
+
+func (u *UnaryExpr) Sub(other Expr) Expr {
+	return NewBinaryExpr(u, other, "subtract")
+}
+
+func (u *UnaryExpr) Mul(other Expr) Expr {
+	return NewBinaryExpr(u, other, "multiply")
+}
+
+func (u *UnaryExpr) Div(other Expr) Expr {
+	return NewBinaryExpr(u, other, "divide")
+}
+
+func (u *UnaryExpr) Gt(other Expr) Expr {
+	return NewBinaryExpr(u, other, "greater")
+}
+
+func (u *UnaryExpr) Lt(other Expr) Expr {
+	return NewBinaryExpr(u, other, "less")
+}
+
+func (u *UnaryExpr) Eq(other Expr) Expr {
+	return NewBinaryExpr(u, other, "equal")
+}
+
+// String manipulation methods
+func (u *UnaryExpr) Contains(substring Expr) Expr {
+	return NewBinaryExpr(u, substring, "contains")
+}
+
+func (u *UnaryExpr) StartsWith(prefix Expr) Expr {
+	return NewBinaryExpr(u, prefix, "starts_with")
+}
+
+func (u *UnaryExpr) EndsWith(suffix Expr) Expr {
+	return NewBinaryExpr(u, suffix, "ends_with")
+}
+
+// Temporal methods for UnaryExpr
+func (u *UnaryExpr) Year() Expr {
+	return NewUnaryExpr(u, "year")
+}
+
+func (u *UnaryExpr) Month() Expr {
+	return NewUnaryExpr(u, "month")
+}
+
+func (u *UnaryExpr) Day() Expr {
+	return NewUnaryExpr(u, "day")
+}
+
+func (u *UnaryExpr) Hour() Expr {
+	return NewUnaryExpr(u, "hour")
+}
+
+func (u *UnaryExpr) Minute() Expr {
+	return NewUnaryExpr(u, "minute")
+}
+
+func (u *UnaryExpr) Second() Expr {
+	return NewUnaryExpr(u, "second")
+}
+
+func (u *UnaryExpr) TruncateToYear() Expr {
+	return NewUnaryExpr(u, "trunc_year")
+}
+
+func (u *UnaryExpr) TruncateToMonth() Expr {
+	return NewUnaryExpr(u, "trunc_month")
+}
+
+func (u *UnaryExpr) TruncateToDay() Expr {
+	return NewUnaryExpr(u, "trunc_day")
+}
+
+func (u *UnaryExpr) TruncateToHour() Expr {
+	return NewUnaryExpr(u, "trunc_hour")
+}
+
+func (u *UnaryExpr) AddDays(days Expr) Expr {
+	return NewBinaryExpr(u, days, "add_days")
+}
+
+func (u *UnaryExpr) AddHours(hours Expr) Expr {
+	return NewBinaryExpr(u, hours, "add_hours")
+}
+
+func (u *UnaryExpr) AddMinutes(minutes Expr) Expr {
+	return NewBinaryExpr(u, minutes, "add_minutes")
+}
+
+func (u *UnaryExpr) AddSeconds(seconds Expr) Expr {
+	return NewBinaryExpr(u, seconds, "add_seconds")
+}
+
 // Helper functions for safe type assertions
 func asFloat64Array(arr arrow.Array) (*array.Float64, bool) {
 	f64arr, ok := arr.(*array.Float64)
@@ -888,4 +1258,478 @@ func inferDataType(value interface{}) arrow.DataType {
 		// Default to string for unknown types
 		return arrow.BinaryTypes.String
 	}
+}
+
+// ====================
+// Temporal Operations
+// ====================
+
+// evaluateYear extracts the year component from timestamps
+func (u *UnaryExpr) evaluateYear(arr arrow.Array) (arrow.Array, error) {
+	if arr.DataType().ID() != arrow.TIMESTAMP {
+		return nil, fmt.Errorf("year operation requires timestamp type, got %s", arr.DataType())
+	}
+
+	tsArray := arr.(*array.Timestamp)
+	tsType := tsArray.DataType().(*arrow.TimestampType)
+	toTime, err := tsType.GetToTimeFunc()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get time conversion function: %w", err)
+	}
+
+	pool := memory.NewGoAllocator()
+	builder := array.NewInt64Builder(pool)
+	defer builder.Release()
+
+	for i := 0; i < arr.Len(); i++ {
+		if tsArray.IsNull(i) {
+			builder.AppendNull()
+		} else {
+			t := toTime(tsArray.Value(i))
+			builder.Append(int64(t.Year()))
+		}
+	}
+
+	return builder.NewArray(), nil
+}
+
+// evaluateMonth extracts the month component (1-12) from timestamps
+func (u *UnaryExpr) evaluateMonth(arr arrow.Array) (arrow.Array, error) {
+	if arr.DataType().ID() != arrow.TIMESTAMP {
+		return nil, fmt.Errorf("month operation requires timestamp type, got %s", arr.DataType())
+	}
+
+	tsArray := arr.(*array.Timestamp)
+	tsType := tsArray.DataType().(*arrow.TimestampType)
+	toTime, err := tsType.GetToTimeFunc()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get time conversion function: %w", err)
+	}
+
+	pool := memory.NewGoAllocator()
+	builder := array.NewInt64Builder(pool)
+	defer builder.Release()
+
+	for i := 0; i < arr.Len(); i++ {
+		if tsArray.IsNull(i) {
+			builder.AppendNull()
+		} else {
+			t := toTime(tsArray.Value(i))
+			builder.Append(int64(t.Month()))
+		}
+	}
+
+	return builder.NewArray(), nil
+}
+
+// evaluateDay extracts the day component (1-31) from timestamps
+func (u *UnaryExpr) evaluateDay(arr arrow.Array) (arrow.Array, error) {
+	if arr.DataType().ID() != arrow.TIMESTAMP {
+		return nil, fmt.Errorf("day operation requires timestamp type, got %s", arr.DataType())
+	}
+
+	tsArray := arr.(*array.Timestamp)
+	tsType := tsArray.DataType().(*arrow.TimestampType)
+	toTime, err := tsType.GetToTimeFunc()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get time conversion function: %w", err)
+	}
+
+	pool := memory.NewGoAllocator()
+	builder := array.NewInt64Builder(pool)
+	defer builder.Release()
+
+	for i := 0; i < arr.Len(); i++ {
+		if tsArray.IsNull(i) {
+			builder.AppendNull()
+		} else {
+			t := toTime(tsArray.Value(i))
+			builder.Append(int64(t.Day()))
+		}
+	}
+
+	return builder.NewArray(), nil
+}
+
+// evaluateHour extracts the hour component (0-23) from timestamps
+func (u *UnaryExpr) evaluateHour(arr arrow.Array) (arrow.Array, error) {
+	if arr.DataType().ID() != arrow.TIMESTAMP {
+		return nil, fmt.Errorf("hour operation requires timestamp type, got %s", arr.DataType())
+	}
+
+	tsArray := arr.(*array.Timestamp)
+	tsType := tsArray.DataType().(*arrow.TimestampType)
+	toTime, err := tsType.GetToTimeFunc()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get time conversion function: %w", err)
+	}
+
+	pool := memory.NewGoAllocator()
+	builder := array.NewInt64Builder(pool)
+	defer builder.Release()
+
+	for i := 0; i < arr.Len(); i++ {
+		if tsArray.IsNull(i) {
+			builder.AppendNull()
+		} else {
+			t := toTime(tsArray.Value(i))
+			builder.Append(int64(t.Hour()))
+		}
+	}
+
+	return builder.NewArray(), nil
+}
+
+// evaluateMinute extracts the minute component (0-59) from timestamps
+func (u *UnaryExpr) evaluateMinute(arr arrow.Array) (arrow.Array, error) {
+	if arr.DataType().ID() != arrow.TIMESTAMP {
+		return nil, fmt.Errorf("minute operation requires timestamp type, got %s", arr.DataType())
+	}
+
+	tsArray := arr.(*array.Timestamp)
+	tsType := tsArray.DataType().(*arrow.TimestampType)
+	toTime, err := tsType.GetToTimeFunc()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get time conversion function: %w", err)
+	}
+
+	pool := memory.NewGoAllocator()
+	builder := array.NewInt64Builder(pool)
+	defer builder.Release()
+
+	for i := 0; i < arr.Len(); i++ {
+		if tsArray.IsNull(i) {
+			builder.AppendNull()
+		} else {
+			t := toTime(tsArray.Value(i))
+			builder.Append(int64(t.Minute()))
+		}
+	}
+
+	return builder.NewArray(), nil
+}
+
+// evaluateSecond extracts the second component (0-59) from timestamps
+func (u *UnaryExpr) evaluateSecond(arr arrow.Array) (arrow.Array, error) {
+	if arr.DataType().ID() != arrow.TIMESTAMP {
+		return nil, fmt.Errorf("second operation requires timestamp type, got %s", arr.DataType())
+	}
+
+	tsArray := arr.(*array.Timestamp)
+	tsType := tsArray.DataType().(*arrow.TimestampType)
+	toTime, err := tsType.GetToTimeFunc()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get time conversion function: %w", err)
+	}
+
+	pool := memory.NewGoAllocator()
+	builder := array.NewInt64Builder(pool)
+	defer builder.Release()
+
+	for i := 0; i < arr.Len(); i++ {
+		if tsArray.IsNull(i) {
+			builder.AppendNull()
+		} else {
+			t := toTime(tsArray.Value(i))
+			builder.Append(int64(t.Second()))
+		}
+	}
+
+	return builder.NewArray(), nil
+}
+
+// evaluateTruncateToYear truncates timestamps to the start of the year
+func (u *UnaryExpr) evaluateTruncateToYear(arr arrow.Array) (arrow.Array, error) {
+	if arr.DataType().ID() != arrow.TIMESTAMP {
+		return nil, fmt.Errorf("truncate operation requires timestamp type, got %s", arr.DataType())
+	}
+
+	tsArray := arr.(*array.Timestamp)
+	tsType := tsArray.DataType().(*arrow.TimestampType)
+	toTime, err := tsType.GetToTimeFunc()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get time conversion function: %w", err)
+	}
+
+	pool := memory.NewGoAllocator()
+	builder := array.NewTimestampBuilder(pool, tsType)
+	defer builder.Release()
+
+	for i := 0; i < arr.Len(); i++ {
+		if tsArray.IsNull(i) {
+			builder.AppendNull()
+		} else {
+			t := toTime(tsArray.Value(i))
+			truncated := time.Date(t.Year(), 1, 1, 0, 0, 0, 0, t.Location())
+			ts, err := arrow.TimestampFromTime(truncated, tsType.Unit)
+			if err != nil {
+				return nil, fmt.Errorf("failed to convert time to timestamp: %w", err)
+			}
+			builder.Append(ts)
+		}
+	}
+
+	return builder.NewArray(), nil
+}
+
+// evaluateTruncateToMonth truncates timestamps to the start of the month
+func (u *UnaryExpr) evaluateTruncateToMonth(arr arrow.Array) (arrow.Array, error) {
+	if arr.DataType().ID() != arrow.TIMESTAMP {
+		return nil, fmt.Errorf("truncate operation requires timestamp type, got %s", arr.DataType())
+	}
+
+	tsArray := arr.(*array.Timestamp)
+	tsType := tsArray.DataType().(*arrow.TimestampType)
+	toTime, err := tsType.GetToTimeFunc()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get time conversion function: %w", err)
+	}
+
+	pool := memory.NewGoAllocator()
+	builder := array.NewTimestampBuilder(pool, tsType)
+	defer builder.Release()
+
+	for i := 0; i < arr.Len(); i++ {
+		if tsArray.IsNull(i) {
+			builder.AppendNull()
+		} else {
+			t := toTime(tsArray.Value(i))
+			truncated := time.Date(t.Year(), t.Month(), 1, 0, 0, 0, 0, t.Location())
+			ts, err := arrow.TimestampFromTime(truncated, tsType.Unit)
+			if err != nil {
+				return nil, fmt.Errorf("failed to convert time to timestamp: %w", err)
+			}
+			builder.Append(ts)
+		}
+	}
+
+	return builder.NewArray(), nil
+}
+
+// evaluateTruncateToDay truncates timestamps to the start of the day
+func (u *UnaryExpr) evaluateTruncateToDay(arr arrow.Array) (arrow.Array, error) {
+	if arr.DataType().ID() != arrow.TIMESTAMP {
+		return nil, fmt.Errorf("truncate operation requires timestamp type, got %s", arr.DataType())
+	}
+
+	tsArray := arr.(*array.Timestamp)
+	tsType := tsArray.DataType().(*arrow.TimestampType)
+	toTime, err := tsType.GetToTimeFunc()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get time conversion function: %w", err)
+	}
+
+	pool := memory.NewGoAllocator()
+	builder := array.NewTimestampBuilder(pool, tsType)
+	defer builder.Release()
+
+	for i := 0; i < arr.Len(); i++ {
+		if tsArray.IsNull(i) {
+			builder.AppendNull()
+		} else {
+			t := toTime(tsArray.Value(i))
+			truncated := time.Date(t.Year(), t.Month(), t.Day(), 0, 0, 0, 0, t.Location())
+			ts, err := arrow.TimestampFromTime(truncated, tsType.Unit)
+			if err != nil {
+				return nil, fmt.Errorf("failed to convert time to timestamp: %w", err)
+			}
+			builder.Append(ts)
+		}
+	}
+
+	return builder.NewArray(), nil
+}
+
+// evaluateTruncateToHour truncates timestamps to the start of the hour
+func (u *UnaryExpr) evaluateTruncateToHour(arr arrow.Array) (arrow.Array, error) {
+	if arr.DataType().ID() != arrow.TIMESTAMP {
+		return nil, fmt.Errorf("truncate operation requires timestamp type, got %s", arr.DataType())
+	}
+
+	tsArray := arr.(*array.Timestamp)
+	tsType := tsArray.DataType().(*arrow.TimestampType)
+	toTime, err := tsType.GetToTimeFunc()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get time conversion function: %w", err)
+	}
+
+	pool := memory.NewGoAllocator()
+	builder := array.NewTimestampBuilder(pool, tsType)
+	defer builder.Release()
+
+	for i := 0; i < arr.Len(); i++ {
+		if tsArray.IsNull(i) {
+			builder.AppendNull()
+		} else {
+			t := toTime(tsArray.Value(i))
+			truncated := time.Date(t.Year(), t.Month(), t.Day(), t.Hour(), 0, 0, 0, t.Location())
+			ts, err := arrow.TimestampFromTime(truncated, tsType.Unit)
+			if err != nil {
+				return nil, fmt.Errorf("failed to convert time to timestamp: %w", err)
+			}
+			builder.Append(ts)
+		}
+	}
+
+	return builder.NewArray(), nil
+}
+
+// evaluateAddDays adds a number of days to timestamps
+func (b *BinaryExpr) evaluateAddDays(left, right arrow.Array) (arrow.Array, error) {
+	if left.DataType().ID() != arrow.TIMESTAMP {
+		return nil, fmt.Errorf("add_days left operand must be timestamp, got %s", left.DataType())
+	}
+	if right.DataType().ID() != arrow.INT64 {
+		return nil, fmt.Errorf("add_days right operand must be int64, got %s", right.DataType())
+	}
+
+	tsArray := left.(*array.Timestamp)
+	tsType := tsArray.DataType().(*arrow.TimestampType)
+	toTime, err := tsType.GetToTimeFunc()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get time conversion function: %w", err)
+	}
+
+	daysArray := right.(*array.Int64)
+
+	pool := memory.NewGoAllocator()
+	builder := array.NewTimestampBuilder(pool, tsType)
+	defer builder.Release()
+
+	for i := 0; i < left.Len(); i++ {
+		if tsArray.IsNull(i) || daysArray.IsNull(i) {
+			builder.AppendNull()
+		} else {
+			t := toTime(tsArray.Value(i))
+			days := daysArray.Value(i)
+			newTime := t.AddDate(0, 0, int(days))
+			ts, err := arrow.TimestampFromTime(newTime, tsType.Unit)
+			if err != nil {
+				return nil, fmt.Errorf("failed to convert time to timestamp: %w", err)
+			}
+			builder.Append(ts)
+		}
+	}
+
+	return builder.NewArray(), nil
+}
+
+// evaluateAddHours adds a number of hours to timestamps
+func (b *BinaryExpr) evaluateAddHours(left, right arrow.Array) (arrow.Array, error) {
+	if left.DataType().ID() != arrow.TIMESTAMP {
+		return nil, fmt.Errorf("add_hours left operand must be timestamp, got %s", left.DataType())
+	}
+	if right.DataType().ID() != arrow.INT64 {
+		return nil, fmt.Errorf("add_hours right operand must be int64, got %s", right.DataType())
+	}
+
+	tsArray := left.(*array.Timestamp)
+	tsType := tsArray.DataType().(*arrow.TimestampType)
+	toTime, err := tsType.GetToTimeFunc()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get time conversion function: %w", err)
+	}
+
+	hoursArray := right.(*array.Int64)
+
+	pool := memory.NewGoAllocator()
+	builder := array.NewTimestampBuilder(pool, tsType)
+	defer builder.Release()
+
+	for i := 0; i < left.Len(); i++ {
+		if tsArray.IsNull(i) || hoursArray.IsNull(i) {
+			builder.AppendNull()
+		} else {
+			t := toTime(tsArray.Value(i))
+			hours := hoursArray.Value(i)
+			newTime := t.Add(time.Duration(hours) * time.Hour)
+			ts, err := arrow.TimestampFromTime(newTime, tsType.Unit)
+			if err != nil {
+				return nil, fmt.Errorf("failed to convert time to timestamp: %w", err)
+			}
+			builder.Append(ts)
+		}
+	}
+
+	return builder.NewArray(), nil
+}
+
+// evaluateAddMinutes adds a number of minutes to timestamps
+func (b *BinaryExpr) evaluateAddMinutes(left, right arrow.Array) (arrow.Array, error) {
+	if left.DataType().ID() != arrow.TIMESTAMP {
+		return nil, fmt.Errorf("add_minutes left operand must be timestamp, got %s", left.DataType())
+	}
+	if right.DataType().ID() != arrow.INT64 {
+		return nil, fmt.Errorf("add_minutes right operand must be int64, got %s", right.DataType())
+	}
+
+	tsArray := left.(*array.Timestamp)
+	tsType := tsArray.DataType().(*arrow.TimestampType)
+	toTime, err := tsType.GetToTimeFunc()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get time conversion function: %w", err)
+	}
+
+	minutesArray := right.(*array.Int64)
+
+	pool := memory.NewGoAllocator()
+	builder := array.NewTimestampBuilder(pool, tsType)
+	defer builder.Release()
+
+	for i := 0; i < left.Len(); i++ {
+		if tsArray.IsNull(i) || minutesArray.IsNull(i) {
+			builder.AppendNull()
+		} else {
+			t := toTime(tsArray.Value(i))
+			minutes := minutesArray.Value(i)
+			newTime := t.Add(time.Duration(minutes) * time.Minute)
+			ts, err := arrow.TimestampFromTime(newTime, tsType.Unit)
+			if err != nil {
+				return nil, fmt.Errorf("failed to convert time to timestamp: %w", err)
+			}
+			builder.Append(ts)
+		}
+	}
+
+	return builder.NewArray(), nil
+}
+
+// evaluateAddSeconds adds a number of seconds to timestamps
+func (b *BinaryExpr) evaluateAddSeconds(left, right arrow.Array) (arrow.Array, error) {
+	if left.DataType().ID() != arrow.TIMESTAMP {
+		return nil, fmt.Errorf("add_seconds left operand must be timestamp, got %s", left.DataType())
+	}
+	if right.DataType().ID() != arrow.INT64 {
+		return nil, fmt.Errorf("add_seconds right operand must be int64, got %s", right.DataType())
+	}
+
+	tsArray := left.(*array.Timestamp)
+	tsType := tsArray.DataType().(*arrow.TimestampType)
+	toTime, err := tsType.GetToTimeFunc()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get time conversion function: %w", err)
+	}
+
+	secondsArray := right.(*array.Int64)
+
+	pool := memory.NewGoAllocator()
+	builder := array.NewTimestampBuilder(pool, tsType)
+	defer builder.Release()
+
+	for i := 0; i < left.Len(); i++ {
+		if tsArray.IsNull(i) || secondsArray.IsNull(i) {
+			builder.AppendNull()
+		} else {
+			t := toTime(tsArray.Value(i))
+			seconds := secondsArray.Value(i)
+			newTime := t.Add(time.Duration(seconds) * time.Second)
+			ts, err := arrow.TimestampFromTime(newTime, tsType.Unit)
+			if err != nil {
+				return nil, fmt.Errorf("failed to convert time to timestamp: %w", err)
+			}
+			builder.Append(ts)
+		}
+	}
+
+	return builder.NewArray(), nil
 }
