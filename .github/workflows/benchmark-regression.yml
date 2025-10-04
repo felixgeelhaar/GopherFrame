@@ -1,0 +1,257 @@
+name: Benchmark Regression Check
+
+on:
+  pull_request:
+    branches: [ main ]
+    paths:
+      - '**.go'
+      - 'go.mod'
+      - 'go.sum'
+      - '.github/workflows/benchmark-regression.yml'
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  benchmark-comparison:
+    name: Compare Benchmarks vs Base Branch
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout PR code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0  # Need full history for comparison
+
+    - name: Set up Go
+      uses: actions/setup-go@v5
+      with:
+        go-version: '1.23'
+        cache: true
+
+    - name: Install benchstat
+      run: go install golang.org/x/perf/cmd/benchstat@latest
+
+    - name: Download dependencies
+      run: go mod download
+
+    - name: Run benchmarks on PR branch
+      run: |
+        echo "Running benchmarks on PR branch..."
+        go test -bench=. -benchmem -benchtime=3s -count=5 -run=^$ ./pkg/core > pr_bench.txt 2>&1 || true
+        cat pr_bench.txt
+
+    - name: Checkout base branch
+      run: |
+        git fetch origin ${{ github.base_ref }}
+        git checkout origin/${{ github.base_ref }}
+
+    - name: Download dependencies (base)
+      run: go mod download
+
+    - name: Run benchmarks on base branch
+      run: |
+        echo "Running benchmarks on base branch..."
+        go test -bench=. -benchmem -benchtime=3s -count=5 -run=^$ ./pkg/core > base_bench.txt 2>&1 || true
+        cat base_bench.txt
+
+    - name: Compare benchmarks with benchstat
+      id: comparison
+      run: |
+        echo "Comparing benchmarks..."
+
+        # Run benchstat comparison
+        benchstat base_bench.txt pr_bench.txt > comparison.txt 2>&1 || true
+
+        # Display results
+        cat comparison.txt
+
+        # Check for significant regressions (>10% slower)
+        # benchstat output format: name old_time new_time delta
+        REGRESSION_FOUND=false
+
+        # Parse benchstat output and check for regressions
+        while IFS= read -r line; do
+          # Look for lines with performance deltas
+          if echo "$line" | grep -E '\+[0-9]+\.[0-9]+%' > /dev/null; then
+            # Extract the percentage change
+            DELTA=$(echo "$line" | grep -oE '\+[0-9]+\.[0-9]+%' | grep -oE '[0-9]+\.[0-9]+')
+
+            # Check if regression is > 10%
+            if (( $(echo "$DELTA > 10.0" | bc -l) )); then
+              echo "⚠️  Regression detected: $line"
+              REGRESSION_FOUND=true
+            fi
+          fi
+        done < comparison.txt
+
+        # Save comparison result
+        echo "regression_found=$REGRESSION_FOUND" >> $GITHUB_OUTPUT
+
+        # Save comparison text for PR comment
+        echo 'comparison<<EOF' >> $GITHUB_OUTPUT
+        cat comparison.txt >> $GITHUB_OUTPUT
+        echo 'EOF' >> $GITHUB_OUTPUT
+
+    - name: Create performance summary
+      id: summary
+      run: |
+        # Create a markdown summary
+        cat > summary.md << 'SUMMARY_EOF'
+        ## 📊 Benchmark Comparison Results
+
+        This PR's performance compared to `${{ github.base_ref }}`:
+
+        ```
+        SUMMARY_EOF
+
+        cat comparison.txt >> summary.md
+
+        cat >> summary.md << 'SUMMARY_EOF'
+        ```
+
+        ### How to interpret these results:
+
+        - **~** indicates no statistically significant change
+        - **+X%** indicates the PR is slower by X%
+        - **-X%** indicates the PR is faster by X%
+
+        ### Performance Regression Policy:
+
+        - ✅ **No action needed** if changes are ~0% or improvements (negative %)
+        - ⚠️  **Review required** if regressions are 5-10%
+        - ❌ **Must fix** if regressions are >10%
+
+        ---
+
+        <details>
+        <summary>How were these benchmarks run?</summary>
+
+        - **Tool**: Go's built-in benchmarking + `benchstat` for statistical comparison
+        - **Iterations**: 5 runs per benchmark, 3 seconds each
+        - **Comparison**: Statistical significance testing to filter noise
+        - **Platform**: Ubuntu latest, Go 1.23
+
+        </details>
+
+        <details>
+        <summary>How to run benchmarks locally</summary>
+
+        ```bash
+        # Run all benchmarks
+        go test -bench=. -benchmem -benchtime=3s ./pkg/core
+
+        # Run specific benchmark
+        go test -bench=BenchmarkSelect -benchmem ./pkg/core
+
+        # Compare with base branch
+        git checkout main
+        go test -bench=. -benchtime=3s -count=5 ./pkg/core > base.txt
+        git checkout your-branch
+        go test -bench=. -benchtime=3s -count=5 ./pkg/core > pr.txt
+        benchstat base.txt pr.txt
+        ```
+
+        </details>
+        SUMMARY_EOF
+
+        # Save summary for PR comment
+        echo 'summary<<EOF' >> $GITHUB_OUTPUT
+        cat summary.md >> $GITHUB_OUTPUT
+        echo 'EOF' >> $GITHUB_OUTPUT
+
+    - name: Comment PR with benchmark results
+      uses: actions/github-script@v7
+      with:
+        github-token: ${{ secrets.GITHUB_TOKEN }}
+        script: |
+          const summary = `${{ steps.summary.outputs.summary }}`;
+
+          // Find existing comment
+          const comments = await github.rest.issues.listComments({
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            issue_number: context.issue.number,
+          });
+
+          const botComment = comments.data.find(comment =>
+            comment.user.type === 'Bot' &&
+            comment.body.includes('Benchmark Comparison Results')
+          );
+
+          if (botComment) {
+            // Update existing comment
+            await github.rest.issues.updateComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              comment_id: botComment.id,
+              body: summary
+            });
+          } else {
+            // Create new comment
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body: summary
+            });
+          }
+
+    - name: Check regression threshold
+      if: steps.comparison.outputs.regression_found == 'true'
+      run: |
+        echo "❌ Performance regression detected (>10% slower)"
+        echo ""
+        echo "The following benchmarks show significant performance regressions:"
+        grep -E '\+[0-9]+\.[0-9]+%' comparison.txt || true
+        echo ""
+        echo "Please investigate and optimize the code, or provide justification for the regression."
+        echo ""
+        echo "To see detailed results, check the benchmark comparison comment on this PR."
+        exit 1
+
+    - name: Upload benchmark artifacts
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: benchmark-results
+        path: |
+          base_bench.txt
+          pr_bench.txt
+          comparison.txt
+        retention-days: 30
+
+  quick-smoke-test:
+    name: Quick Benchmark Smoke Test
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Go
+      uses: actions/setup-go@v5
+      with:
+        go-version: '1.23'
+        cache: true
+
+    - name: Download dependencies
+      run: go mod download
+
+    - name: Run quick benchmark sanity check
+      run: |
+        echo "Running quick benchmark smoke test..."
+        go test -bench=BenchmarkDataFrameCreation_1K -benchtime=1s -run=^$ ./pkg/core || {
+          echo "❌ Benchmark execution failed!"
+          echo "This may indicate broken benchmark code."
+          exit 1
+        }
+
+        echo "✅ Benchmark smoke test passed"
+
+    - name: Verify benchmark helpers compile
+      run: |
+        echo "Checking benchmark helper functions..."
+        go test -c -o /dev/null ./pkg/core
+        echo "✅ Benchmark code compiles successfully"
