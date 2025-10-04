@@ -1096,3 +1096,431 @@ func TestDataFrame_Rolling_EmptyDataFrame(t *testing.T) {
 	assert.Equal(t, int64(2), result.NumCols())
 	assert.Equal(t, int64(0), result.NumRows())
 }
+
+// TestDataFrame_CumSum tests cumulative sum function.
+func TestDataFrame_CumSum(t *testing.T) {
+	pool := memory.NewGoAllocator()
+
+	// Create test data:
+	// value
+	// -----
+	// 10
+	// 20
+	// 30
+	// 40
+	schema := arrow.NewSchema(
+		[]arrow.Field{
+			{Name: "value", Type: arrow.PrimitiveTypes.Int64},
+		},
+		nil,
+	)
+
+	valueBuilder := array.NewInt64Builder(pool)
+	defer valueBuilder.Release()
+	valueBuilder.AppendValues([]int64{10, 20, 30, 40}, nil)
+
+	record := array.NewRecord(schema, []arrow.Array{
+		valueBuilder.NewArray(),
+	}, 4)
+	defer record.Release()
+
+	df := NewDataFrame(record)
+	defer df.Release()
+
+	// Test: Cumulative sum
+	result, err := df.Window().
+		Over(CumSum("value").As("cumsum"))
+	require.NoError(t, err)
+	require.NotNil(t, result)
+	defer result.Release()
+
+	// Verify results
+	assert.Equal(t, int64(2), result.NumCols()) // value, cumsum
+	assert.Equal(t, int64(4), result.NumRows())
+
+	cumsumSeries, err := result.Column("cumsum")
+	require.NoError(t, err)
+	cumsumCol := cumsumSeries.Array().(*array.Float64)
+
+	// Expected: 10, 30, 60, 100
+	expected := []float64{10, 30, 60, 100}
+	for i := 0; i < cumsumCol.Len(); i++ {
+		assert.Equal(t, expected[i], cumsumCol.Value(i), "cumsum at index %d", i)
+	}
+}
+
+// TestDataFrame_CumMax tests cumulative maximum function.
+func TestDataFrame_CumMax(t *testing.T) {
+	pool := memory.NewGoAllocator()
+
+	schema := arrow.NewSchema(
+		[]arrow.Field{
+			{Name: "value", Type: arrow.PrimitiveTypes.Int64},
+		},
+		nil,
+	)
+
+	valueBuilder := array.NewInt64Builder(pool)
+	defer valueBuilder.Release()
+	valueBuilder.AppendValues([]int64{5, 2, 8, 3, 9}, nil)
+
+	record := array.NewRecord(schema, []arrow.Array{
+		valueBuilder.NewArray(),
+	}, 5)
+	defer record.Release()
+
+	df := NewDataFrame(record)
+	defer df.Release()
+
+	// Test: Cumulative maximum
+	result, err := df.Window().
+		Over(CumMax("value").As("cummax"))
+	require.NoError(t, err)
+	require.NotNil(t, result)
+	defer result.Release()
+
+	cummaxSeries, err := result.Column("cummax")
+	require.NoError(t, err)
+	cummaxCol := cummaxSeries.Array().(*array.Float64)
+
+	// Expected: 5, 5, 8, 8, 9
+	expected := []float64{5, 5, 8, 8, 9}
+	for i := 0; i < cummaxCol.Len(); i++ {
+		assert.Equal(t, expected[i], cummaxCol.Value(i), "cummax at index %d", i)
+	}
+}
+
+// TestDataFrame_CumMin tests cumulative minimum function.
+func TestDataFrame_CumMin(t *testing.T) {
+	pool := memory.NewGoAllocator()
+
+	schema := arrow.NewSchema(
+		[]arrow.Field{
+			{Name: "value", Type: arrow.PrimitiveTypes.Int64},
+		},
+		nil,
+	)
+
+	valueBuilder := array.NewInt64Builder(pool)
+	defer valueBuilder.Release()
+	valueBuilder.AppendValues([]int64{5, 2, 8, 1, 9}, nil)
+
+	record := array.NewRecord(schema, []arrow.Array{
+		valueBuilder.NewArray(),
+	}, 5)
+	defer record.Release()
+
+	df := NewDataFrame(record)
+	defer df.Release()
+
+	// Test: Cumulative minimum
+	result, err := df.Window().
+		Over(CumMin("value").As("cummin"))
+	require.NoError(t, err)
+	require.NotNil(t, result)
+	defer result.Release()
+
+	cumminSeries, err := result.Column("cummin")
+	require.NoError(t, err)
+	cumminCol := cumminSeries.Array().(*array.Float64)
+
+	// Expected: 5, 2, 2, 1, 1
+	expected := []float64{5, 2, 2, 1, 1}
+	for i := 0; i < cumminCol.Len(); i++ {
+		assert.Equal(t, expected[i], cumminCol.Value(i), "cummin at index %d", i)
+	}
+}
+
+// TestDataFrame_CumProd tests cumulative product function.
+func TestDataFrame_CumProd(t *testing.T) {
+	pool := memory.NewGoAllocator()
+
+	schema := arrow.NewSchema(
+		[]arrow.Field{
+			{Name: "value", Type: arrow.PrimitiveTypes.Float64},
+		},
+		nil,
+	)
+
+	valueBuilder := array.NewFloat64Builder(pool)
+	defer valueBuilder.Release()
+	valueBuilder.AppendValues([]float64{2.0, 3.0, 0.5, 2.0}, nil)
+
+	record := array.NewRecord(schema, []arrow.Array{
+		valueBuilder.NewArray(),
+	}, 4)
+	defer record.Release()
+
+	df := NewDataFrame(record)
+	defer df.Release()
+
+	// Test: Cumulative product
+	result, err := df.Window().
+		Over(CumProd("value").As("cumprod"))
+	require.NoError(t, err)
+	require.NotNil(t, result)
+	defer result.Release()
+
+	cumprodSeries, err := result.Column("cumprod")
+	require.NoError(t, err)
+	cumprodCol := cumprodSeries.Array().(*array.Float64)
+
+	// Expected: 2.0, 6.0, 3.0, 6.0
+	// 2.0
+	// 2.0 * 3.0 = 6.0
+	// 6.0 * 0.5 = 3.0
+	// 3.0 * 2.0 = 6.0
+	expected := []float64{2.0, 6.0, 3.0, 6.0}
+	for i := 0; i < cumprodCol.Len(); i++ {
+		assert.InDelta(t, expected[i], cumprodCol.Value(i), 0.001, "cumprod at index %d", i)
+	}
+}
+
+// TestDataFrame_Cumulative_WithNulls tests cumulative functions with null values.
+func TestDataFrame_Cumulative_WithNulls(t *testing.T) {
+	pool := memory.NewGoAllocator()
+
+	schema := arrow.NewSchema(
+		[]arrow.Field{
+			{Name: "value", Type: arrow.PrimitiveTypes.Int64},
+		},
+		nil,
+	)
+
+	valueBuilder := array.NewInt64Builder(pool)
+	defer valueBuilder.Release()
+	// 10, NULL, 30, NULL, 50
+	valueBuilder.AppendValues([]int64{10, 0, 30, 0, 50}, []bool{true, false, true, false, true})
+
+	record := array.NewRecord(schema, []arrow.Array{
+		valueBuilder.NewArray(),
+	}, 5)
+	defer record.Release()
+
+	df := NewDataFrame(record)
+	defer df.Release()
+
+	// Test: Cumulative sum with nulls (nulls are skipped)
+	result, err := df.Window().
+		Over(CumSum("value").As("cumsum"))
+	require.NoError(t, err)
+	require.NotNil(t, result)
+	defer result.Release()
+
+	cumsumSeries, err := result.Column("cumsum")
+	require.NoError(t, err)
+	cumsumCol := cumsumSeries.Array().(*array.Float64)
+
+	// Expected: 10, 10, 40, 40, 90
+	// Nulls don't affect the running sum
+	expected := []float64{10, 10, 40, 40, 90}
+	for i := 0; i < cumsumCol.Len(); i++ {
+		assert.Equal(t, expected[i], cumsumCol.Value(i), "cumsum at index %d", i)
+	}
+}
+
+// TestDataFrame_Cumulative_WithPartitions tests cumulative functions with partitioning.
+func TestDataFrame_Cumulative_WithPartitions(t *testing.T) {
+	pool := memory.NewGoAllocator()
+
+	// Create test data with categories
+	schema := arrow.NewSchema(
+		[]arrow.Field{
+			{Name: "category", Type: arrow.BinaryTypes.String},
+			{Name: "value", Type: arrow.PrimitiveTypes.Int64},
+		},
+		nil,
+	)
+
+	categoryBuilder := array.NewStringBuilder(pool)
+	defer categoryBuilder.Release()
+	categoryBuilder.AppendValues([]string{"A", "A", "A", "B", "B", "B"}, nil)
+
+	valueBuilder := array.NewInt64Builder(pool)
+	defer valueBuilder.Release()
+	valueBuilder.AppendValues([]int64{10, 20, 30, 100, 200, 300}, nil)
+
+	record := array.NewRecord(schema, []arrow.Array{
+		categoryBuilder.NewArray(),
+		valueBuilder.NewArray(),
+	}, 6)
+	defer record.Release()
+
+	df := NewDataFrame(record)
+	defer df.Release()
+
+	// Test: Cumulative sum within each category
+	result, err := df.Window().
+		PartitionBy("category").
+		Over(CumSum("value").As("cumsum"))
+	require.NoError(t, err)
+	require.NotNil(t, result)
+	defer result.Release()
+
+	cumsumSeries, err := result.Column("cumsum")
+	require.NoError(t, err)
+	cumsumCol := cumsumSeries.Array().(*array.Float64)
+
+	// Expected (partitions reset):
+	// Category A: 10, 30, 60
+	// Category B: 100, 300, 600
+	expected := []float64{10, 30, 60, 100, 300, 600}
+	for i := 0; i < cumsumCol.Len(); i++ {
+		assert.Equal(t, expected[i], cumsumCol.Value(i), "cumsum at index %d", i)
+	}
+}
+
+// TestDataFrame_Cumulative_Multiple tests multiple cumulative functions.
+func TestDataFrame_Cumulative_Multiple(t *testing.T) {
+	pool := memory.NewGoAllocator()
+
+	schema := arrow.NewSchema(
+		[]arrow.Field{
+			{Name: "value", Type: arrow.PrimitiveTypes.Int64},
+		},
+		nil,
+	)
+
+	valueBuilder := array.NewInt64Builder(pool)
+	defer valueBuilder.Release()
+	valueBuilder.AppendValues([]int64{5, 2, 8, 1, 9}, nil)
+
+	record := array.NewRecord(schema, []arrow.Array{
+		valueBuilder.NewArray(),
+	}, 5)
+	defer record.Release()
+
+	df := NewDataFrame(record)
+	defer df.Release()
+
+	// Test: Apply all cumulative functions at once
+	result, err := df.Window().
+		Over(
+			CumSum("value").As("cumsum"),
+			CumMax("value").As("cummax"),
+			CumMin("value").As("cummin"),
+		)
+	require.NoError(t, err)
+	require.NotNil(t, result)
+	defer result.Release()
+
+	// Verify all columns exist
+	assert.Equal(t, int64(4), result.NumCols()) // value, cumsum, cummax, cummin
+
+	// Check cumsum
+	cumsumSeries, err := result.Column("cumsum")
+	require.NoError(t, err)
+	cumsumCol := cumsumSeries.Array().(*array.Float64)
+	expectedSum := []float64{5, 7, 15, 16, 25}
+	for i := 0; i < cumsumCol.Len(); i++ {
+		assert.Equal(t, expectedSum[i], cumsumCol.Value(i), "cumsum at index %d", i)
+	}
+
+	// Check cummax
+	cummaxSeries, err := result.Column("cummax")
+	require.NoError(t, err)
+	cummaxCol := cummaxSeries.Array().(*array.Float64)
+	expectedMax := []float64{5, 5, 8, 8, 9}
+	for i := 0; i < cummaxCol.Len(); i++ {
+		assert.Equal(t, expectedMax[i], cummaxCol.Value(i), "cummax at index %d", i)
+	}
+
+	// Check cummin
+	cumminSeries, err := result.Column("cummin")
+	require.NoError(t, err)
+	cumminCol := cumminSeries.Array().(*array.Float64)
+	expectedMin := []float64{5, 2, 2, 1, 1}
+	for i := 0; i < cumminCol.Len(); i++ {
+		assert.Equal(t, expectedMin[i], cumminCol.Value(i), "cummin at index %d", i)
+	}
+}
+
+// TestDataFrame_Cumulative_AllNulls tests cumulative functions with all null values.
+func TestDataFrame_Cumulative_AllNulls(t *testing.T) {
+	pool := memory.NewGoAllocator()
+
+	schema := arrow.NewSchema(
+		[]arrow.Field{
+			{Name: "value", Type: arrow.PrimitiveTypes.Int64},
+		},
+		nil,
+	)
+
+	valueBuilder := array.NewInt64Builder(pool)
+	defer valueBuilder.Release()
+	// All nulls
+	valueBuilder.AppendValues([]int64{0, 0, 0}, []bool{false, false, false})
+
+	record := array.NewRecord(schema, []arrow.Array{
+		valueBuilder.NewArray(),
+	}, 3)
+	defer record.Release()
+
+	df := NewDataFrame(record)
+	defer df.Release()
+
+	// Test: CumSum with all nulls
+	result, err := df.Window().
+		Over(CumSum("value").As("cumsum"))
+	require.NoError(t, err)
+	require.NotNil(t, result)
+	defer result.Release()
+
+	cumsumSeries, err := result.Column("cumsum")
+	require.NoError(t, err)
+	cumsumCol := cumsumSeries.Array().(*array.Float64)
+
+	// CumSum returns 0 for all nulls (sum starts at 0)
+	for i := 0; i < cumsumCol.Len(); i++ {
+		assert.Equal(t, 0.0, cumsumCol.Value(i), "cumsum should be 0 for all nulls at index %d", i)
+	}
+
+	// Test: CumMax with all nulls
+	result2, err := df.Window().
+		Over(CumMax("value").As("cummax"))
+	require.NoError(t, err)
+	require.NotNil(t, result2)
+	defer result2.Release()
+
+	cummaxSeries, err := result2.Column("cummax")
+	require.NoError(t, err)
+	cummaxCol := cummaxSeries.Array().(*array.Float64)
+
+	// CumMax returns null when no values have been seen
+	for i := 0; i < cummaxCol.Len(); i++ {
+		assert.True(t, cummaxCol.IsNull(i), "cummax should be null for all nulls at index %d", i)
+	}
+}
+
+// TestDataFrame_Cumulative_EmptyDataFrame tests cumulative functions on empty DataFrame.
+func TestDataFrame_Cumulative_EmptyDataFrame(t *testing.T) {
+	pool := memory.NewGoAllocator()
+
+	schema := arrow.NewSchema(
+		[]arrow.Field{
+			{Name: "value", Type: arrow.PrimitiveTypes.Int64},
+		},
+		nil,
+	)
+
+	valueBuilder := array.NewInt64Builder(pool)
+	defer valueBuilder.Release()
+
+	record := array.NewRecord(schema, []arrow.Array{
+		valueBuilder.NewArray(),
+	}, 0)
+	defer record.Release()
+
+	df := NewDataFrame(record)
+	defer df.Release()
+
+	// Test: Cumulative sum on empty DataFrame
+	result, err := df.Window().
+		Over(CumSum("value").As("cumsum"))
+	require.NoError(t, err)
+	require.NotNil(t, result)
+	defer result.Release()
+
+	assert.Equal(t, int64(2), result.NumCols())
+	assert.Equal(t, int64(0), result.NumRows())
+}

@@ -825,3 +825,309 @@ func getNumericValue(arr arrow.Array, idx int) float64 {
 		return 0
 	}
 }
+
+// CumSumFunc implements cumulative sum over a partition.
+//
+// CumSum calculates the running total from the start of the partition
+// to the current row. This is equivalent to RollingSum with unbounded window.
+//
+// Example:
+//
+//	df.Window().
+//	    OrderBy("date").
+//	    Over(CumSum("sales").As("cumulative_sales"))
+type CumSumFunc struct {
+	name       string
+	columnName string
+}
+
+// CumSum creates a new cumulative sum window function.
+//
+// Parameters:
+//   - columnName: Column to sum cumulatively
+//
+// Returns:
+//   - *CumSumFunc: Window function that computes cumulative sum
+//
+// Example:
+//
+//	// Running total of sales
+//	CumSum("sales").As("running_total")
+func CumSum(columnName string) *CumSumFunc {
+	return &CumSumFunc{
+		name:       fmt.Sprintf("cumsum_%s", columnName),
+		columnName: columnName,
+	}
+}
+
+// As sets the result column name.
+func (fn *CumSumFunc) As(name string) *CumSumFunc {
+	fn.name = name
+	return fn
+}
+
+// Name returns the result column name.
+func (fn *CumSumFunc) Name() string {
+	return fn.name
+}
+
+// Compute calculates cumulative sum for the partition.
+func (fn *CumSumFunc) Compute(partition []int, df *DataFrame, ws *WindowSpec) (arrow.Array, error) {
+	series, err := df.Column(fn.columnName)
+	if err != nil {
+		return nil, fmt.Errorf("column %s not found: %w", fn.columnName, err)
+	}
+
+	sourceArray := series.Array()
+	pool := memory.NewGoAllocator()
+	builder := array.NewFloat64Builder(pool)
+	defer builder.Release()
+
+	var cumSum float64
+	for _, rowIdx := range partition {
+		if !sourceArray.IsNull(rowIdx) {
+			cumSum += getNumericValue(sourceArray, rowIdx)
+		}
+		builder.Append(cumSum)
+	}
+
+	return builder.NewArray(), nil
+}
+
+// CumMaxFunc implements cumulative maximum over a partition.
+//
+// CumMax tracks the maximum value seen from the start of the partition
+// to the current row.
+//
+// Example:
+//
+//	df.Window().
+//	    OrderBy("date").
+//	    Over(CumMax("price").As("max_to_date"))
+type CumMaxFunc struct {
+	name       string
+	columnName string
+}
+
+// CumMax creates a new cumulative maximum window function.
+//
+// Parameters:
+//   - columnName: Column to track maximum
+//
+// Returns:
+//   - *CumMaxFunc: Window function that computes cumulative maximum
+//
+// Example:
+//
+//	// Track highest price seen so far
+//	CumMax("price").As("all_time_high")
+func CumMax(columnName string) *CumMaxFunc {
+	return &CumMaxFunc{
+		name:       fmt.Sprintf("cummax_%s", columnName),
+		columnName: columnName,
+	}
+}
+
+// As sets the result column name.
+func (fn *CumMaxFunc) As(name string) *CumMaxFunc {
+	fn.name = name
+	return fn
+}
+
+// Name returns the result column name.
+func (fn *CumMaxFunc) Name() string {
+	return fn.name
+}
+
+// Compute calculates cumulative maximum for the partition.
+func (fn *CumMaxFunc) Compute(partition []int, df *DataFrame, ws *WindowSpec) (arrow.Array, error) {
+	series, err := df.Column(fn.columnName)
+	if err != nil {
+		return nil, fmt.Errorf("column %s not found: %w", fn.columnName, err)
+	}
+
+	sourceArray := series.Array()
+	pool := memory.NewGoAllocator()
+	builder := array.NewFloat64Builder(pool)
+	defer builder.Release()
+
+	var cumMax float64
+	initialized := false
+
+	for _, rowIdx := range partition {
+		if !sourceArray.IsNull(rowIdx) {
+			val := getNumericValue(sourceArray, rowIdx)
+			if !initialized || val > cumMax {
+				cumMax = val
+				initialized = true
+			}
+		}
+
+		if initialized {
+			builder.Append(cumMax)
+		} else {
+			builder.AppendNull()
+		}
+	}
+
+	return builder.NewArray(), nil
+}
+
+// CumMinFunc implements cumulative minimum over a partition.
+//
+// CumMin tracks the minimum value seen from the start of the partition
+// to the current row.
+//
+// Example:
+//
+//	df.Window().
+//	    OrderBy("date").
+//	    Over(CumMin("price").As("min_to_date"))
+type CumMinFunc struct {
+	name       string
+	columnName string
+}
+
+// CumMin creates a new cumulative minimum window function.
+//
+// Parameters:
+//   - columnName: Column to track minimum
+//
+// Returns:
+//   - *CumMinFunc: Window function that computes cumulative minimum
+//
+// Example:
+//
+//	// Track lowest price seen so far
+//	CumMin("price").As("all_time_low")
+func CumMin(columnName string) *CumMinFunc {
+	return &CumMinFunc{
+		name:       fmt.Sprintf("cummin_%s", columnName),
+		columnName: columnName,
+	}
+}
+
+// As sets the result column name.
+func (fn *CumMinFunc) As(name string) *CumMinFunc {
+	fn.name = name
+	return fn
+}
+
+// Name returns the result column name.
+func (fn *CumMinFunc) Name() string {
+	return fn.name
+}
+
+// Compute calculates cumulative minimum for the partition.
+func (fn *CumMinFunc) Compute(partition []int, df *DataFrame, ws *WindowSpec) (arrow.Array, error) {
+	series, err := df.Column(fn.columnName)
+	if err != nil {
+		return nil, fmt.Errorf("column %s not found: %w", fn.columnName, err)
+	}
+
+	sourceArray := series.Array()
+	pool := memory.NewGoAllocator()
+	builder := array.NewFloat64Builder(pool)
+	defer builder.Release()
+
+	var cumMin float64
+	initialized := false
+
+	for _, rowIdx := range partition {
+		if !sourceArray.IsNull(rowIdx) {
+			val := getNumericValue(sourceArray, rowIdx)
+			if !initialized || val < cumMin {
+				cumMin = val
+				initialized = true
+			}
+		}
+
+		if initialized {
+			builder.Append(cumMin)
+		} else {
+			builder.AppendNull()
+		}
+	}
+
+	return builder.NewArray(), nil
+}
+
+// CumProdFunc implements cumulative product over a partition.
+//
+// CumProd calculates the running product from the start of the partition
+// to the current row.
+//
+// Example:
+//
+//	df.Window().
+//	    OrderBy("day").
+//	    Over(CumProd("growth_rate").As("cumulative_growth"))
+type CumProdFunc struct {
+	name       string
+	columnName string
+}
+
+// CumProd creates a new cumulative product window function.
+//
+// Parameters:
+//   - columnName: Column to multiply cumulatively
+//
+// Returns:
+//   - *CumProdFunc: Window function that computes cumulative product
+//
+// Example:
+//
+//	// Running product of daily returns
+//	CumProd("daily_return").As("total_return")
+//
+// Note: Product starts at 1.0. First value is just the first row's value.
+// Returns null if no non-null values have been seen yet.
+func CumProd(columnName string) *CumProdFunc {
+	return &CumProdFunc{
+		name:       fmt.Sprintf("cumprod_%s", columnName),
+		columnName: columnName,
+	}
+}
+
+// As sets the result column name.
+func (fn *CumProdFunc) As(name string) *CumProdFunc {
+	fn.name = name
+	return fn
+}
+
+// Name returns the result column name.
+func (fn *CumProdFunc) Name() string {
+	return fn.name
+}
+
+// Compute calculates cumulative product for the partition.
+func (fn *CumProdFunc) Compute(partition []int, df *DataFrame, ws *WindowSpec) (arrow.Array, error) {
+	series, err := df.Column(fn.columnName)
+	if err != nil {
+		return nil, fmt.Errorf("column %s not found: %w", fn.columnName, err)
+	}
+
+	sourceArray := series.Array()
+	pool := memory.NewGoAllocator()
+	builder := array.NewFloat64Builder(pool)
+	defer builder.Release()
+
+	cumProd := 1.0
+	initialized := false
+
+	for _, rowIdx := range partition {
+		if !sourceArray.IsNull(rowIdx) {
+			val := getNumericValue(sourceArray, rowIdx)
+			cumProd *= val
+			initialized = true
+		}
+
+		if initialized {
+			builder.Append(cumProd)
+		} else {
+			builder.AppendNull()
+		}
+	}
+
+	return builder.NewArray(), nil
+}
