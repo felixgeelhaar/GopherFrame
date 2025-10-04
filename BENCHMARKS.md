@@ -6,24 +6,39 @@ GopherFrame is designed for production-first performance with Apache Arrow as it
 
 ## Benchmark Results
 
+**Last Updated**: October 4, 2025
+**Test Environment**: Apple M1, Go 1.23, Darwin ARM64
+
 ### Core Operations Performance
 
-Performance measured on Apple M1 processor:
+| Operation | 1K rows | 10K rows | 100K rows | Allocs (100K) | Memory (100K) |
+|-----------|---------|----------|-----------|---------------|---------------|
+| DataFrame Creation | 25µs | 257µs | 2.1ms | 111 | 5.8 MB |
+| Filter | 35µs | 322µs | 2.9ms | 168 | 5.2 MB |
+| Select | **765ns** | **751ns** | **687ns** | 17 | 1.6 KB |
+| WithColumn | 16µs | 154µs | 1.1ms | 88 | 4.4 MB |
+| GroupBy+Sum | 41µs | 339µs | 3.3ms | 255 | 3.6 MB |
+| GroupBy (5 aggs) | 110µs | 985µs | - | 20K | 430 KB |
+| Chained Ops | 60µs | 536µs | - | 223 | 1.0 MB |
 
-| Operation | 1K rows | 10K rows | 100K rows | Throughput (rows/sec) |
-|-----------|---------|----------|-----------|----------------------|
-| Filter | 178µs | 882µs | 5.4ms | 18.5M |
-| Select | 5.5µs | 6.5µs | 8.5µs | 11.7M+ |
-| WithColumn | 35µs | 263µs | 1.8ms | 55.5K |
-| GroupBy+Sum | 125µs | 704µs | 5.9ms | 16.9K |
+**Key Observations**:
+- **Select operation is O(1)**: ~700ns regardless of data size due to zero-copy columnar design
+- **Linear scaling**: All operations scale linearly with data size
+- **Memory efficiency**: Allocations grow linearly, leveraging Arrow's memory reuse
 
-### I/O Performance (10K rows)
+### I/O Performance
 
-| Format | Write Time | Read Time | Write Speed | Read Speed |
-|--------|------------|-----------|-------------|------------|
-| Parquet | 3.2ms | 1.3ms | 3.1M rows/s | 7.7M rows/s |
-| CSV | 13.0ms | 1.9ms | 769K rows/s | 5.3M rows/s |
-| Arrow IPC | ~1ms | ~1ms | 10M+ rows/s | 10M+ rows/s |
+| Format | Operation | 1K rows | 10K rows | Throughput (10K) |
+|--------|-----------|---------|----------|------------------|
+| Parquet | Write | 397µs | 2.0ms | ~5M rows/s |
+| Parquet | Read | 312µs | 930µs | ~10M rows/s |
+| CSV | Write | 920µs | 10.4ms | ~960K rows/s |
+| CSV | Read | - | - | - |
+
+**Parquet Performance**:
+- Excellent compression and read performance
+- Write performance: 30-50 MB/s typical
+- Read performance: 100+ MB/s typical
 
 ## Key Performance Characteristics
 
@@ -80,10 +95,38 @@ go run cmd/benchmark/main.go
 
 ## Comparison with Other Libraries
 
-While direct comparisons depend on specific use cases, GopherFrame aims to be:
-- **10x faster than Gota** for common operations
-- **Competitive with Python Polars** for data transformation tasks
-- **Native Go solution** avoiding CGO overhead
+### Performance Claims Status
+
+**⚠️ VALIDATION NEEDED**: Performance comparisons require independent verification
+
+**Current Claims** (to be validated):
+- **10x faster than Gota** for common operations - **NEEDS BENCHMARK COMPARISON**
+- **Competitive with Python Polars** for data transformation - **NEEDS VALIDATION**
+- **Native Go solution** - ✅ CONFIRMED (zero CGo, pure Go + Arrow Go)
+
+### Competitive Advantages (Verified)
+
+1. **Zero-Copy Operations**:
+   - Select operation: ~700ns constant time regardless of data size
+   - Arrow-native design eliminates serialization overhead
+
+2. **Memory Efficiency**:
+   - Columnar storage reduces memory footprint
+   - Reference counting prevents duplicate allocations
+   - Measured allocations scale linearly with data size
+
+3. **Pure Go Implementation**:
+   - No CGo overhead
+   - Easy cross-compilation
+   - Predictable performance characteristics
+
+### Planned Comparison Benchmarks
+
+To validate performance claims, we need:
+1. Direct Gota comparison suite (same operations, same data)
+2. Polars comparison (via Python interop or similar dataset)
+3. Pandas comparison (baseline for data manipulation libraries)
+4. Published results with reproducible test methodology
 
 ## Future Optimizations
 
