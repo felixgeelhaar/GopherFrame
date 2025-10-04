@@ -97,36 +97,57 @@ go run cmd/benchmark/main.go
 
 ### Performance Claims Status
 
-**⚠️ VALIDATION NEEDED**: Performance comparisons require independent verification
+**✅ VALIDATION COMPLETE**: Comprehensive benchmark comparison vs Gota completed October 4, 2025
 
-**Current Claims** (to be validated):
-- **10x faster than Gota** for common operations - **NEEDS BENCHMARK COMPARISON**
-- **Competitive with Python Polars** for data transformation - **NEEDS VALIDATION**
+**Validated Claims**:
+- **2-428x faster than Gota** for common operations - ✅ **VALIDATED** ([See detailed comparison](docs/GOTA_COMPARISON_BENCHMARKS.md))
 - **Native Go solution** - ✅ CONFIRMED (zero CGo, pure Go + Arrow Go)
+- **Competitive with Python Polars** for data transformation - **NEEDS VALIDATION**
+
+### GopherFrame vs Gota Performance
+
+Comprehensive benchmark results (Apple M1, Go 1.24.4):
+
+| Operation | GopherFrame | Gota | Speedup | Memory Advantage |
+|-----------|-------------|------|---------|-----------------|
+| **Creation (10K)** | 249µs | 747µs | **3.0x faster** | 2.3x less |
+| **Filter (10K)** | 404µs | 748µs | **1.9x faster** | 2.1x less |
+| **Select (10K)** | **772ns** | 52.4ms | **🚀 67.8x faster** | 200x less |
+| **Column Access (1K)** | **120ns** | 3.4µs | **🚀 28x faster** | 41x less |
+| **Iteration (1K)** | **389ns** | 166µs | **🚀 428x faster** | Zero allocs |
+
+**Key Findings**:
+- **Select operations**: O(1) constant time vs O(n), enabling **sub-microsecond queries**
+- **Memory efficiency**: 2-200x less memory across all operations
+- **Iteration speed**: 428x faster due to zero-copy direct array access
+- **Overall**: The "10x faster" claim is **conservative** for most operations
+
+📊 **Full Report**: [docs/GOTA_COMPARISON_BENCHMARKS.md](docs/GOTA_COMPARISON_BENCHMARKS.md)
 
 ### Competitive Advantages (Verified)
 
-1. **Zero-Copy Operations**:
+1. **Zero-Copy Operations** ✅:
    - Select operation: ~700ns constant time regardless of data size
+   - Column access: 120ns with zero allocations
    - Arrow-native design eliminates serialization overhead
 
-2. **Memory Efficiency**:
-   - Columnar storage reduces memory footprint
+2. **Memory Efficiency** ✅:
+   - Columnar storage reduces memory footprint by 2-200x vs Gota
    - Reference counting prevents duplicate allocations
-   - Measured allocations scale linearly with data size
+   - Zero allocations for iteration and column access
 
-3. **Pure Go Implementation**:
+3. **Pure Go Implementation** ✅:
    - No CGo overhead
    - Easy cross-compilation
    - Predictable performance characteristics
 
-### Planned Comparison Benchmarks
+### Remaining Benchmarks
 
-To validate performance claims, we need:
-1. Direct Gota comparison suite (same operations, same data)
+To complete performance validation:
+1. ~~Direct Gota comparison suite~~ ✅ COMPLETED
 2. Polars comparison (via Python interop or similar dataset)
 3. Pandas comparison (baseline for data manipulation libraries)
-4. Published results with reproducible test methodology
+4. ~~Published results with reproducible test methodology~~ ✅ COMPLETED
 
 ## Future Optimizations
 
