@@ -49,6 +49,10 @@ func NewDataFrameWithAllocator(record arrow.Record, allocator memory.Allocator) 
 
 // NewDataFrameFromStorage creates a DataFrame by reading from a storage backend.
 func NewDataFrameFromStorage(ctx context.Context, backend storage.Backend, source string, opts storage.ReadOptions) (*DataFrame, error) {
+	if backend == nil {
+		return nil, fmt.Errorf("backend cannot be nil")
+	}
+
 	reader, err := backend.Read(ctx, source, opts)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read from storage: %w", err)
