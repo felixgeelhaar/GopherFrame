@@ -621,6 +621,32 @@ func (df *DataFrame) Select(columnNames []string) (*DataFrame, error) {
 }
 
 // WithColumn returns a new DataFrame with an additional or replaced column.
+//
+// If a column with the specified name already exists, it is replaced. Otherwise,
+// the new column is appended. The column length must match the DataFrame's row count.
+//
+// Parameters:
+//   - columnName: Name for the new or replacement column
+//   - newColumn: Arrow Array containing the column data
+//
+// Returns:
+//   - *DataFrame: New DataFrame with the column added or replaced
+//   - error: Returns error if column is nil or length doesn't match row count
+//
+// Memory: Caller must call Release() on the returned DataFrame
+//
+// Example:
+//
+//	// Add a new column
+//	newCol := array.NewInt64Builder(pool)
+//	// ... build column data ...
+//	df2, err := df.WithColumn("new_id", newCol.NewArray())
+//	if err != nil {
+//	    log.Fatal(err)
+//	}
+//	defer df2.Release()
+//
+// See also: Select for column subsetting
 func (df *DataFrame) WithColumn(columnName string, newColumn arrow.Array) (*DataFrame, error) {
 	if newColumn == nil {
 		return nil, fmt.Errorf("new column cannot be nil")
@@ -691,6 +717,31 @@ func (df *DataFrame) WithColumn(columnName string, newColumn arrow.Array) (*Data
 }
 
 // Filter returns a new DataFrame containing only rows where the predicate is true.
+//
+// This method filters rows based on a boolean mask array. Only rows where the
+// corresponding mask value is true are included in the result. The predicate
+// array must be boolean type and match the DataFrame's row count.
+//
+// Parameters:
+//   - predicateArray: Boolean Arrow Array with true for rows to keep
+//
+// Returns:
+//   - *DataFrame: New DataFrame with filtered rows
+//   - error: Returns error if predicate is not boolean or length mismatch
+//
+// Memory: Caller must call Release() on the returned DataFrame
+//
+// Example:
+//
+//	// Create boolean mask (e.g., age > 18)
+//	mask := ... // boolean array
+//	adults, err := df.Filter(mask)
+//	if err != nil {
+//	    log.Fatal(err)
+//	}
+//	defer adults.Release()
+//
+// See also: Expression-based filtering via expr package
 func (df *DataFrame) Filter(predicateArray arrow.Array) (*DataFrame, error) {
 	// Validate that predicate is boolean array
 	if predicateArray.DataType().ID() != arrow.BOOL {
