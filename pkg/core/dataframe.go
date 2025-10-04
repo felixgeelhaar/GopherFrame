@@ -368,7 +368,26 @@ func (df *DataFrame) HasColumn(name string) bool {
 }
 
 // Equal compares two DataFrames for equality.
-// Returns true if they have the same schema and data.
+//
+// Two DataFrames are considered equal if they have:
+//   - Same schema (column names and types)
+//   - Same number of rows
+//   - Same data values in the same order
+//
+// Parameters:
+//   - other: DataFrame to compare with (can be nil)
+//
+// Returns:
+//   - bool: True if DataFrames are equal, false otherwise
+//
+// Note: This performs a deep comparison of all data values. For large DataFrames,
+// this operation can be expensive.
+//
+// Example:
+//
+//	if df1.Equal(df2) {
+//	    fmt.Println("DataFrames are identical")
+//	}
 func (df *DataFrame) Equal(other *DataFrame) bool {
 	if df == other {
 		return true
@@ -399,6 +418,23 @@ func (df *DataFrame) Equal(other *DataFrame) bool {
 }
 
 // Validate checks the DataFrame for consistency and data integrity.
+//
+// This method verifies that:
+//   - The DataFrame has an underlying record
+//   - Column count matches schema fields
+//   - Each column's type matches its field type in the schema
+//
+// Returns:
+//   - error: Nil if validation passes, error describing the issue otherwise
+//
+// Use this method to verify DataFrame integrity after complex operations or
+// when loading data from untrusted sources.
+//
+// Example:
+//
+//	if err := df.Validate(); err != nil {
+//	    log.Fatalf("DataFrame validation failed: %v", err)
+//	}
 func (df *DataFrame) Validate() error {
 	if df.record == nil {
 		return fmt.Errorf("DataFrame has no underlying record")
@@ -424,7 +460,17 @@ func (df *DataFrame) Validate() error {
 }
 
 // String returns a string representation of the DataFrame.
-// This is primarily for debugging and should not be used for large DataFrames.
+//
+// Implements the fmt.Stringer interface. Returns a summary showing row count,
+// column count, and schema information. This is primarily for debugging and
+// should not be used for large DataFrames as it doesn't truncate output.
+//
+// Returns:
+//   - string: Human-readable representation of the DataFrame
+//
+// Example Output:
+//
+//	"DataFrame{rows: 1000, cols: 5, schema: schema<id: int64, name: utf8, ...>}"
 func (df *DataFrame) String() string {
 	if df.record == nil {
 		return "DataFrame{<empty>}"
@@ -435,7 +481,21 @@ func (df *DataFrame) String() string {
 }
 
 // Clone creates a shallow copy of the DataFrame.
-// The underlying Arrow data is shared (copy-on-write semantics).
+//
+// The returned DataFrame shares the underlying Arrow data with the original
+// (copy-on-write semantics). The reference count is incremented to prevent
+// premature deallocation. Both DataFrames must be released independently.
+//
+// Returns:
+//   - *DataFrame: A new DataFrame sharing the same underlying data
+//
+// Memory: Caller must call Release() on the cloned DataFrame when done
+//
+// Example:
+//
+//	df2 := df.Clone()
+//	defer df2.Release()
+//	// df2 shares data with df but is an independent reference
 func (df *DataFrame) Clone() *DataFrame {
 	df.record.Retain() // Increment reference count
 	return &DataFrame{
@@ -446,6 +506,30 @@ func (df *DataFrame) Clone() *DataFrame {
 }
 
 // WriteToStorage saves the DataFrame to a storage backend.
+//
+// This method writes the DataFrame to various storage formats (Parquet, CSV, Arrow IPC)
+// through the provided storage backend. The operation supports context cancellation
+// and format-specific options.
+//
+// Parameters:
+//   - ctx: Context for cancellation and timeout control
+//   - backend: Storage backend (uses df.backend if nil and available)
+//   - destination: Path or identifier for write destination
+//   - opts: Write options (format-specific settings)
+//
+// Returns:
+//   - error: Returns error if destination is empty, no backend available, or write fails
+//
+// Example:
+//
+//	ctx := context.Background()
+//	backend := arrowbackend.NewBackend()
+//	err := df.WriteToStorage(ctx, backend, "output.parquet", storage.WriteOptions{})
+//	if err != nil {
+//	    log.Fatal(err)
+//	}
+//
+// See also: NewDataFrameFromStorage for reading data
 func (df *DataFrame) WriteToStorage(ctx context.Context, backend storage.Backend, destination string, opts storage.WriteOptions) error {
 	if destination == "" {
 		return fmt.Errorf("destination cannot be empty")
@@ -468,6 +552,30 @@ func (df *DataFrame) WriteToStorage(ctx context.Context, backend storage.Backend
 }
 
 // Select returns a new DataFrame with only the specified columns.
+//
+// This operation is O(1) due to Arrow's columnar format - it creates a new schema
+// and record with pointers to the selected columns without copying data (zero-copy).
+// The order of columns in the result matches the order specified in columnNames.
+//
+// Parameters:
+//   - columnNames: Slice of column names to include in the result
+//
+// Returns:
+//   - *DataFrame: New DataFrame with only the selected columns
+//   - error: Returns error if no columns specified or if any column not found
+//
+// Memory: Caller must call Release() on the returned DataFrame
+//
+// Example:
+//
+//	// Select specific columns
+//	subset, err := df.Select([]string{"id", "name", "age"})
+//	if err != nil {
+//	    log.Fatal(err)
+//	}
+//	defer subset.Release()
+//
+// Complexity: O(1) for zero-copy column selection
 func (df *DataFrame) Select(columnNames []string) (*DataFrame, error) {
 	if len(columnNames) == 0 {
 		return nil, fmt.Errorf("no columns specified for selection")
