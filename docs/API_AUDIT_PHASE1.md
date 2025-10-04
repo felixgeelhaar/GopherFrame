@@ -565,12 +565,12 @@ Clear, Pandas-like API ✅
 
 ## Action Items
 
-### Immediate (This Week)
-- [ ] Fix GetString to return error
-- [ ] Add context to all error messages
-- [ ] Add input validation for empty/nil
-- [ ] Add JoinType.String() method
-- [ ] Document thread-safety of all methods
+### Immediate (This Week) - ✅ COMPLETED
+- [x] Fix GetString to return error (already returned error - verified)
+- [x] Add context to all error messages (commit 2402f0a)
+- [x] Add input validation for empty/nil (commit 2402f0a)
+- [x] Add JoinType.String() method (commit 2402f0a)
+- [x] Document thread-safety of all methods (commit 4eaa2c7)
 
 ### Short Term (Next 2 Weeks)
 - [ ] Complete godoc for pkg/core
