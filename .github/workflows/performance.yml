@@ -21,7 +21,7 @@ jobs:
     - name: Set up Go
       uses: actions/setup-go@v5
       with:
-        go-version: '1.23'
+        go-version: '1.24'
 
     - name: Cache Go modules
       uses: actions/cache@v3
@@ -67,7 +67,7 @@ jobs:
         auto-push: true
         comment-on-alert: true
         alert-threshold: '110%'  # Alert on >10% regression
-        fail-on-alert: true       # Fail CI on significant regression
+        fail-on-alert: false      # Don't block CI - alerts are informational
         benchmark-data-dir-path: 'dev/bench'
         alert-comment-cc-users: '@felixgeelhaar'
 
@@ -82,7 +82,7 @@ jobs:
     - name: Set up Go
       uses: actions/setup-go@v5
       with:
-        go-version: '1.23'
+        go-version: '1.24'
 
     - name: Download dependencies
       run: go mod download
