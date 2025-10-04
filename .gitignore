@@ -8,6 +8,11 @@
 # Test binary, built with `go test -c`
 *.test
 
+# Example binaries (cmd/examples/*/<name>)
+cmd/examples/*/*
+!cmd/examples/*/main.go
+!cmd/examples/*/*.go
+
 # Output of the go coverage tool
 *.out
 
