@@ -4,6 +4,8 @@
 package interfaces
 
 import (
+	"fmt"
+
 	"github.com/apache/arrow-go/v18/arrow"
 	"github.com/felixgeelhaar/GopherFrame/pkg/application"
 	"github.com/felixgeelhaar/GopherFrame/pkg/domain/aggregation"
@@ -173,9 +175,11 @@ func (gdf *GroupedDataFrame) Agg(specs ...AggregationSpec) *DataFrame {
 	domainSpecs := make([]aggregation.AggregationSpec, len(specs))
 	for i, spec := range specs {
 		domainSpecs[i] = aggregation.AggregationSpec{
-			Column: spec.Column,
-			Type:   aggregation.AggregationType(spec.Type),
-			Alias:  spec.Alias,
+			Column:       spec.Column,
+			Type:         aggregation.AggregationType(spec.Type),
+			Alias:        spec.Alias,
+			Percentile:   spec.Percentile,
+			SecondColumn: spec.SecondColumn,
 		}
 	}
 
@@ -204,13 +208,19 @@ const (
 	CountAgg
 	MinAgg
 	MaxAgg
+	PercentileAgg
+	MedianAgg
+	ModeAgg
+	CorrelationAgg
 )
 
 // AggregationSpec specifies an aggregation operation for the public API.
 type AggregationSpec struct {
-	Column string
-	Type   AggregationType
-	Alias  string
+	Column       string
+	Type         AggregationType
+	Alias        string
+	Percentile   float64 // For Percentile aggregation (0.0-1.0)
+	SecondColumn string  // For Correlation aggregation
 }
 
 // Sum creates a sum aggregation specification.
@@ -255,6 +265,47 @@ func Max(column string) AggregationSpec {
 		Column: column,
 		Type:   MaxAgg,
 		Alias:  column + "_max",
+	}
+}
+
+// Percentile creates a percentile aggregation specification.
+// The p parameter should be between 0.0 and 1.0 (e.g., 0.95 for 95th percentile).
+func Percentile(column string, p float64) AggregationSpec {
+	return AggregationSpec{
+		Column:     column,
+		Type:       PercentileAgg,
+		Alias:      fmt.Sprintf("%s_p%.0f", column, p*100),
+		Percentile: p,
+	}
+}
+
+// Median creates a median aggregation specification (equivalent to 50th percentile).
+func Median(column string) AggregationSpec {
+	return AggregationSpec{
+		Column:     column,
+		Type:       MedianAgg,
+		Alias:      column + "_median",
+		Percentile: 0.5, // Median is 50th percentile
+	}
+}
+
+// Mode creates a mode aggregation specification (most frequent value).
+func Mode(column string) AggregationSpec {
+	return AggregationSpec{
+		Column: column,
+		Type:   ModeAgg,
+		Alias:  column + "_mode",
+	}
+}
+
+// Correlation creates a correlation aggregation specification.
+// Calculates the Pearson correlation coefficient between two columns.
+func Correlation(column1, column2 string) AggregationSpec {
+	return AggregationSpec{
+		Column:       column1,
+		SecondColumn: column2,
+		Type:         CorrelationAgg,
+		Alias:        fmt.Sprintf("corr_%s_%s", column1, column2),
 	}
 }
 
