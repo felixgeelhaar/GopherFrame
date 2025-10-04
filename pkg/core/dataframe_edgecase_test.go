@@ -204,7 +204,7 @@ func TestDataFrame_WithColumnEdgeCases(t *testing.T) {
 
 	_, err = df.WithColumn("short", shortSeries.Array())
 	assert.Error(t, err, "Adding column with wrong length should error")
-	assert.Contains(t, err.Error(), "does not match DataFrame rows", "Error should mention row mismatch")
+	assert.Contains(t, err.Error(), "length mismatch", "Error should mention length mismatch")
 }
 
 // TestDataFrame_FilterEdgeCases tests Filter edge cases

@@ -53,18 +53,22 @@ func NewDataFrameFromStorage(ctx context.Context, backend storage.Backend, sourc
 		return nil, fmt.Errorf("backend cannot be nil")
 	}
 
+	if source == "" {
+		return nil, fmt.Errorf("source cannot be empty")
+	}
+
 	reader, err := backend.Read(ctx, source, opts)
 	if err != nil {
-		return nil, fmt.Errorf("failed to read from storage: %w", err)
+		return nil, fmt.Errorf("failed to read DataFrame from source %q: %w", source, err)
 	}
 	defer func() { _ = reader.Close() }()
 
 	// For now, read the first record. Future versions will handle multiple records.
 	if !reader.Next() {
 		if err := reader.Err(); err != nil {
-			return nil, fmt.Errorf("failed to read record: %w", err)
+			return nil, fmt.Errorf("failed to read record from source %q: %w", source, err)
 		}
-		return nil, fmt.Errorf("no records found in source: %s", source)
+		return nil, fmt.Errorf("no records found in source %q", source)
 	}
 
 	record := reader.Record()
@@ -124,7 +128,7 @@ func (df *DataFrame) Column(name string) (*Series, error) {
 	}
 
 	if fieldIndex == -1 {
-		return nil, fmt.Errorf("column not found: %s", name)
+		return nil, fmt.Errorf("column %q not found; available columns: %v", name, df.ColumnNames())
 	}
 
 	column := df.record.Column(fieldIndex)
@@ -250,6 +254,10 @@ func (df *DataFrame) Clone() *DataFrame {
 
 // WriteToStorage saves the DataFrame to a storage backend.
 func (df *DataFrame) WriteToStorage(ctx context.Context, backend storage.Backend, destination string, opts storage.WriteOptions) error {
+	if destination == "" {
+		return fmt.Errorf("destination cannot be empty")
+	}
+
 	if backend == nil {
 		if df.backend == nil {
 			return fmt.Errorf("no storage backend available")
@@ -289,7 +297,7 @@ func (df *DataFrame) Select(columnNames []string) (*DataFrame, error) {
 		}
 
 		if fieldIndex == -1 {
-			return nil, fmt.Errorf("column not found: %s", name)
+			return nil, fmt.Errorf("column %q not found in Select; available columns: %v", name, df.ColumnNames())
 		}
 		indices[i] = fieldIndex
 	}
@@ -319,7 +327,7 @@ func (df *DataFrame) WithColumn(columnName string, newColumn arrow.Array) (*Data
 
 	// Validate column length matches DataFrame
 	if int64(newColumn.Len()) != df.NumRows() {
-		return nil, fmt.Errorf("column length %d does not match DataFrame rows %d", newColumn.Len(), df.NumRows())
+		return nil, fmt.Errorf("column %q length mismatch: got %d, expected %d rows", columnName, newColumn.Len(), df.NumRows())
 	}
 
 	newColumn.Retain() // Take ownership
@@ -827,6 +835,18 @@ const (
 	InnerJoin JoinType = iota
 	LeftJoin
 )
+
+// String returns the string representation of JoinType for debugging.
+func (jt JoinType) String() string {
+	switch jt {
+	case InnerJoin:
+		return "InnerJoin"
+	case LeftJoin:
+		return "LeftJoin"
+	default:
+		return fmt.Sprintf("JoinType(%d)", jt)
+	}
+}
 
 // Join performs a join operation between this DataFrame and another DataFrame.
 // Uses hash join algorithm for efficient processing.
