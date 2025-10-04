@@ -871,18 +871,79 @@ func (df *DataFrame) Filter(predicateArray arrow.Array) (*DataFrame, error) {
 	return NewDataFrame(filteredRecord), nil
 }
 
-// SortKey represents a sorting specification for multi-column sorts
+// SortKey represents a sorting specification for multi-column sorts.
+//
+// Each SortKey defines a column to sort by and the sort direction (ascending or descending).
+// Multiple SortKeys are applied in order, with later keys breaking ties from earlier keys.
 type SortKey struct {
-	Column    string
-	Ascending bool
+	Column    string // Column name to sort by
+	Ascending bool   // true for ascending, false for descending
 }
 
 // Sort returns a new DataFrame sorted by the specified column.
+//
+// This is a convenience method that delegates to SortMultiple with a single sort key.
+// For sorting by multiple columns, use SortMultiple directly.
+//
+// Parameters:
+//   - columnName: Name of the column to sort by
+//   - ascending: true for ascending order, false for descending
+//
+// Returns:
+//   - *DataFrame: New DataFrame with rows sorted by the specified column
+//   - error: Returns error if column not found or sort operation fails
+//
+// Memory: Caller must call Release() on the returned DataFrame
+//
+// Example:
+//
+//	// Sort by age in descending order
+//	sorted, err := df.Sort("age", false)
+//	if err != nil {
+//	    log.Fatal(err)
+//	}
+//	defer sorted.Release()
+//
+// See also: SortMultiple for multi-column sorting
 func (df *DataFrame) Sort(columnName string, ascending bool) (*DataFrame, error) {
 	return df.SortMultiple([]SortKey{{Column: columnName, Ascending: ascending}})
 }
 
 // SortMultiple returns a new DataFrame sorted by multiple columns in the specified order.
+//
+// This method performs a stable sort using the provided sort keys. Sort keys are applied
+// in order, with later keys used to break ties from earlier keys. The implementation uses
+// a stable insertion sort algorithm to preserve relative order of equal elements.
+//
+// Null values are sorted last regardless of sort direction. The sort creates new arrays
+// for all columns, reordering values based on the sort criteria.
+//
+// Parameters:
+//   - sortKeys: Slice of SortKey specifying columns and directions to sort by
+//
+// Returns:
+//   - *DataFrame: New DataFrame with rows sorted according to sort keys
+//   - error: Returns error if no sort keys provided, column not found, or unsupported data type
+//
+// Supported data types: INT64, FLOAT64, STRING, BOOL
+//
+// Memory: Caller must call Release() on the returned DataFrame
+//
+// Example:
+//
+//	// Sort by department (ascending), then salary (descending)
+//	sorted, err := df.SortMultiple([]SortKey{
+//	    {Column: "department", Ascending: true},
+//	    {Column: "salary", Ascending: false},
+//	})
+//	if err != nil {
+//	    log.Fatal(err)
+//	}
+//	defer sorted.Release()
+//
+// Complexity: O(n log n) where n is the number of rows
+//
+// See also: Sort for single-column sorting
 func (df *DataFrame) SortMultiple(sortKeys []SortKey) (*DataFrame, error) {
 	if len(sortKeys) == 0 {
 		return nil, fmt.Errorf("no sort keys provided")
@@ -1139,11 +1200,35 @@ func (df *DataFrame) stableSort(indices []int, less func(i, j int) bool) {
 }
 
 // Release decrements the reference count of the underlying Arrow Record.
-// The DataFrame should not be used after calling Release().
-// It is safe to call Release multiple times.
+//
+// This method must be called when you're done with the DataFrame to prevent memory leaks.
+// After calling Release(), the DataFrame should not be used again. It is safe to call
+// Release() multiple times - subsequent calls after the first will have no effect.
+//
+// Memory Management:
+//   - Decrements the Arrow Record's reference count
+//   - When reference count reaches zero, the underlying memory is freed
+//   - Sets internal record to nil to prevent use-after-free
 //
 // Thread Safety: Release() is NOT thread-safe. Only call Release() when you're
-// certain no other goroutines are accessing this DataFrame.
+// certain no other goroutines are accessing this DataFrame. For concurrent usage,
+// ensure proper synchronization or use Clone() to create independent references.
+//
+// Example:
+//
+//	df := NewDataFrame(record)
+//	defer df.Release()  // Ensure cleanup even on error
+//	// ... use df ...
+//
+// Common Pattern with Multiple Operations:
+//
+//	df1 := NewDataFrame(record)
+//	defer df1.Release()
+//
+//	df2, _ := df1.Filter(mask)
+//	defer df2.Release()  // Each DataFrame needs its own Release()
+//
+// See also: Clone for creating independent references with separate lifecycle
 func (df *DataFrame) Release() {
 	if df.record != nil {
 		df.record.Release()
@@ -1184,15 +1269,29 @@ func (r *singleRecordReader) Close() error {
 	return nil // No resources to clean up
 }
 
-// JoinType represents the type of join operation
+// JoinType represents the type of join operation to perform.
+//
+// Join types determine how rows from two DataFrames are combined based on matching keys.
 type JoinType int
 
 const (
+	// InnerJoin includes only rows where the join key exists in both DataFrames.
+	// Rows without matches in either DataFrame are excluded from the result.
 	InnerJoin JoinType = iota
+
+	// LeftJoin includes all rows from the left DataFrame, with matching rows from
+	// the right DataFrame. Rows from the left without matches have null values for
+	// right DataFrame columns.
 	LeftJoin
 )
 
 // String returns the string representation of JoinType for debugging.
+//
+// This implements the fmt.Stringer interface, providing human-readable
+// output for join type values.
+//
+// Returns:
+//   - string: "InnerJoin", "LeftJoin", or "JoinType(n)" for unknown types
 func (jt JoinType) String() string {
 	switch jt {
 	case InnerJoin:
@@ -1205,7 +1304,43 @@ func (jt JoinType) String() string {
 }
 
 // Join performs a join operation between this DataFrame and another DataFrame.
-// Uses hash join algorithm for efficient processing.
+//
+// This method implements a hash join algorithm for O(n+m) complexity where n and m
+// are the row counts of the two DataFrames. The join combines rows based on equality
+// of specified key columns. Column name conflicts are resolved by prefixing right
+// DataFrame columns with "right_".
+//
+// Parameters:
+//   - other: DataFrame to join with (right side)
+//   - leftKey: Column name in this DataFrame to join on
+//   - rightKey: Column name in other DataFrame to join on
+//   - joinType: Type of join (InnerJoin or LeftJoin)
+//
+// Returns:
+//   - *DataFrame: New DataFrame containing the join result
+//   - error: Returns error if other is nil, join keys not found, or join fails
+//
+// Join Behavior:
+//   - InnerJoin: Only rows with matching keys in both DataFrames
+//   - LeftJoin: All rows from left, nulls for non-matching right rows
+//   - Null key values are excluded from join matching
+//   - Result schema excludes duplicate join key (keeps left key only)
+//   - Conflicting column names are prefixed with "right_"
+//
+// Memory: Caller must call Release() on the returned DataFrame
+//
+// Example:
+//
+//	// Inner join on user_id
+//	result, err := users.Join(orders, "id", "user_id", InnerJoin)
+//	if err != nil {
+//	    log.Fatal(err)
+//	}
+//	defer result.Release()
+//
+// Complexity: O(n+m) where n=left rows, m=right rows (hash join)
+//
+// See also: InnerJoin, LeftJoin for convenience methods
 func (df *DataFrame) Join(other *DataFrame, leftKey, rightKey string, joinType JoinType) (*DataFrame, error) {
 	if other == nil {
 		return nil, fmt.Errorf("other DataFrame cannot be nil")
@@ -1234,12 +1369,70 @@ func (df *DataFrame) Join(other *DataFrame, leftKey, rightKey string, joinType J
 	}
 }
 
-// InnerJoin is a convenience method for inner joins
+// InnerJoin performs an inner join with another DataFrame.
+//
+// This is a convenience method that delegates to Join() with InnerJoin type.
+// An inner join returns only rows where the join key exists in both DataFrames.
+// Rows without matches in either DataFrame are excluded from the result.
+//
+// Parameters:
+//   - other: DataFrame to join with (right side)
+//   - leftKey: Column name in this DataFrame to join on
+//   - rightKey: Column name in other DataFrame to join on
+//
+// Returns:
+//   - *DataFrame: New DataFrame containing only matching rows from both sides
+//   - error: Returns error if other is nil, join keys not found, or join fails
+//
+// Memory: Caller must call Release() on the returned DataFrame
+//
+// Example:
+//
+//	// Get all orders with customer information
+//	result, err := customers.InnerJoin(orders, "customer_id", "id")
+//	if err != nil {
+//	    log.Fatal(err)
+//	}
+//	defer result.Release()
+//
+// Complexity: O(n+m) where n=left rows, m=right rows (hash join)
+//
+// See also: Join for explicit join type, LeftJoin for left outer join
 func (df *DataFrame) InnerJoin(other *DataFrame, leftKey, rightKey string) (*DataFrame, error) {
 	return df.Join(other, leftKey, rightKey, InnerJoin)
 }
 
-// LeftJoin is a convenience method for left joins
+// LeftJoin performs a left outer join with another DataFrame.
+//
+// This is a convenience method that delegates to Join() with LeftJoin type.
+// A left join returns all rows from the left DataFrame, with matching rows from
+// the right DataFrame. Rows from the left without matches have null values for
+// all right DataFrame columns.
+//
+// Parameters:
+//   - other: DataFrame to join with (right side)
+//   - leftKey: Column name in this DataFrame to join on
+//   - rightKey: Column name in other DataFrame to join on
+//
+// Returns:
+//   - *DataFrame: New DataFrame with all left rows and matching right rows
+//   - error: Returns error if other is nil, join keys not found, or join fails
+//
+// Memory: Caller must call Release() on the returned DataFrame
+//
+// Example:
+//
+//	// Get all users with their orders (including users with no orders)
+//	result, err := users.LeftJoin(orders, "id", "user_id")
+//	if err != nil {
+//	    log.Fatal(err)
+//	}
+//	defer result.Release()
+//	// Users without orders will have null values in order columns
+//
+// Complexity: O(n+m) where n=left rows, m=right rows (hash join)
+//
+// See also: Join for explicit join type, InnerJoin for inner join
 func (df *DataFrame) LeftJoin(other *DataFrame, leftKey, rightKey string) (*DataFrame, error) {
 	return df.Join(other, leftKey, rightKey, LeftJoin)
 }
