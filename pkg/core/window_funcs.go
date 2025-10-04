@@ -51,7 +51,7 @@ func (fn *RowNumberFunc) Name() string {
 }
 
 // Compute calculates row numbers for the partition.
-func (fn *RowNumberFunc) Compute(partition []int, df *DataFrame) (arrow.Array, error) {
+func (fn *RowNumberFunc) Compute(partition []int, df *DataFrame, ws *WindowSpec) (arrow.Array, error) {
 	pool := memory.NewGoAllocator()
 	builder := array.NewInt64Builder(pool)
 	defer builder.Release()
@@ -105,7 +105,7 @@ func (fn *RankFunc) Name() string {
 }
 
 // Compute calculates ranks for the partition.
-func (fn *RankFunc) Compute(partition []int, df *DataFrame) (arrow.Array, error) {
+func (fn *RankFunc) Compute(partition []int, df *DataFrame, ws *WindowSpec) (arrow.Array, error) {
 	pool := memory.NewGoAllocator()
 	builder := array.NewInt64Builder(pool)
 	defer builder.Release()
@@ -171,7 +171,7 @@ func (fn *DenseRankFunc) Name() string {
 }
 
 // Compute calculates dense ranks for the partition.
-func (fn *DenseRankFunc) Compute(partition []int, df *DataFrame) (arrow.Array, error) {
+func (fn *DenseRankFunc) Compute(partition []int, df *DataFrame, ws *WindowSpec) (arrow.Array, error) {
 	pool := memory.NewGoAllocator()
 	builder := array.NewInt64Builder(pool)
 	defer builder.Release()
@@ -268,7 +268,7 @@ func (fn *LagFunc) Name() string {
 }
 
 // Compute calculates lag values for the partition.
-func (fn *LagFunc) Compute(partition []int, df *DataFrame) (arrow.Array, error) {
+func (fn *LagFunc) Compute(partition []int, df *DataFrame, ws *WindowSpec) (arrow.Array, error) {
 	// Get source column
 	series, err := df.Column(fn.columnName)
 	if err != nil {
@@ -381,7 +381,7 @@ func (fn *LeadFunc) Name() string {
 }
 
 // Compute calculates lead values for the partition.
-func (fn *LeadFunc) Compute(partition []int, df *DataFrame) (arrow.Array, error) {
+func (fn *LeadFunc) Compute(partition []int, df *DataFrame, ws *WindowSpec) (arrow.Array, error) {
 	// Get source column
 	series, err := df.Column(fn.columnName)
 	if err != nil {
@@ -419,4 +419,409 @@ func (fn *LeadFunc) Compute(partition []int, df *DataFrame) (arrow.Array, error)
 	}
 
 	return builder.NewArray(), nil
+}
+
+// RollingSumFunc implements rolling sum aggregation over a window of rows.
+//
+// RollingSum calculates the sum of values within a sliding window of rows.
+// The window size is specified using Rows() on the WindowSpec.
+//
+// Example:
+//
+//	df.Window().
+//	    OrderBy("date").
+//	    Rows(7).
+//	    Over(RollingSum("sales").As("rolling_sum_7"))
+type RollingSumFunc struct {
+	name       string
+	columnName string
+}
+
+// RollingSum creates a new rolling sum window function.
+//
+// Parameters:
+//   - columnName: Column to sum over the rolling window
+//
+// Returns:
+//   - *RollingSumFunc: Window function that computes rolling sum
+//
+// Note: Requires Rows(n) to be specified in the window specification
+func RollingSum(columnName string) *RollingSumFunc {
+	return &RollingSumFunc{
+		name:       fmt.Sprintf("rolling_sum_%s", columnName),
+		columnName: columnName,
+	}
+}
+
+// As sets the result column name.
+func (fn *RollingSumFunc) As(name string) *RollingSumFunc {
+	fn.name = name
+	return fn
+}
+
+// Name returns the result column name.
+func (fn *RollingSumFunc) Name() string {
+	return fn.name
+}
+
+// Compute calculates rolling sum for the partition.
+func (fn *RollingSumFunc) Compute(partition []int, df *DataFrame, ws *WindowSpec) (arrow.Array, error) {
+	series, err := df.Column(fn.columnName)
+	if err != nil {
+		return nil, fmt.Errorf("column %s not found: %w", fn.columnName, err)
+	}
+
+	sourceArray := series.Array()
+	pool := memory.NewGoAllocator()
+	builder := array.NewFloat64Builder(pool)
+	defer builder.Release()
+
+	windowSize := ws.windowSize
+	if windowSize == 0 {
+		windowSize = len(partition) // unbounded = entire partition
+	}
+
+	// Compute rolling sum for each position
+	for i := range partition {
+		start := i - windowSize + 1
+		if start < 0 {
+			start = 0
+		}
+
+		var sum float64
+		hasNonNull := false
+		for j := start; j <= i; j++ {
+			rowIdx := partition[j]
+			if !sourceArray.IsNull(rowIdx) {
+				hasNonNull = true
+				val := getNumericValue(sourceArray, rowIdx)
+				sum += val
+			}
+		}
+
+		if hasNonNull {
+			builder.Append(sum)
+		} else {
+			builder.AppendNull()
+		}
+	}
+
+	return builder.NewArray(), nil
+}
+
+// RollingMeanFunc implements rolling mean (average) aggregation over a window of rows.
+//
+// RollingMean calculates the average of values within a sliding window of rows.
+//
+// Example:
+//
+//	df.Window().
+//	    OrderBy("date").
+//	    Rows(30).
+//	    Over(RollingMean("price").As("moving_avg_30"))
+type RollingMeanFunc struct {
+	name       string
+	columnName string
+}
+
+// RollingMean creates a new rolling mean window function.
+//
+// Parameters:
+//   - columnName: Column to average over the rolling window
+//
+// Returns:
+//   - *RollingMeanFunc: Window function that computes rolling mean
+//
+// Note: Requires Rows(n) to be specified in the window specification
+func RollingMean(columnName string) *RollingMeanFunc {
+	return &RollingMeanFunc{
+		name:       fmt.Sprintf("rolling_mean_%s", columnName),
+		columnName: columnName,
+	}
+}
+
+// As sets the result column name.
+func (fn *RollingMeanFunc) As(name string) *RollingMeanFunc {
+	fn.name = name
+	return fn
+}
+
+// Name returns the result column name.
+func (fn *RollingMeanFunc) Name() string {
+	return fn.name
+}
+
+// Compute calculates rolling mean for the partition.
+func (fn *RollingMeanFunc) Compute(partition []int, df *DataFrame, ws *WindowSpec) (arrow.Array, error) {
+	series, err := df.Column(fn.columnName)
+	if err != nil {
+		return nil, fmt.Errorf("column %s not found: %w", fn.columnName, err)
+	}
+
+	sourceArray := series.Array()
+	pool := memory.NewGoAllocator()
+	builder := array.NewFloat64Builder(pool)
+	defer builder.Release()
+
+	windowSize := ws.windowSize
+	if windowSize == 0 {
+		windowSize = len(partition)
+	}
+
+	for i := range partition {
+		start := i - windowSize + 1
+		if start < 0 {
+			start = 0
+		}
+
+		var sum float64
+		count := 0
+		for j := start; j <= i; j++ {
+			rowIdx := partition[j]
+			if !sourceArray.IsNull(rowIdx) {
+				sum += getNumericValue(sourceArray, rowIdx)
+				count++
+			}
+		}
+
+		if count > 0 {
+			builder.Append(sum / float64(count))
+		} else {
+			builder.AppendNull()
+		}
+	}
+
+	return builder.NewArray(), nil
+}
+
+// RollingMinFunc implements rolling minimum aggregation over a window of rows.
+type RollingMinFunc struct {
+	name       string
+	columnName string
+}
+
+// RollingMin creates a new rolling minimum window function.
+func RollingMin(columnName string) *RollingMinFunc {
+	return &RollingMinFunc{
+		name:       fmt.Sprintf("rolling_min_%s", columnName),
+		columnName: columnName,
+	}
+}
+
+// As sets the result column name.
+func (fn *RollingMinFunc) As(name string) *RollingMinFunc {
+	fn.name = name
+	return fn
+}
+
+// Name returns the result column name.
+func (fn *RollingMinFunc) Name() string {
+	return fn.name
+}
+
+// Compute calculates rolling minimum for the partition.
+func (fn *RollingMinFunc) Compute(partition []int, df *DataFrame, ws *WindowSpec) (arrow.Array, error) {
+	series, err := df.Column(fn.columnName)
+	if err != nil {
+		return nil, fmt.Errorf("column %s not found: %w", fn.columnName, err)
+	}
+
+	sourceArray := series.Array()
+	pool := memory.NewGoAllocator()
+	builder := array.NewFloat64Builder(pool)
+	defer builder.Release()
+
+	windowSize := ws.windowSize
+	if windowSize == 0 {
+		windowSize = len(partition)
+	}
+
+	for i := range partition {
+		start := i - windowSize + 1
+		if start < 0 {
+			start = 0
+		}
+
+		var min float64
+		hasValue := false
+		for j := start; j <= i; j++ {
+			rowIdx := partition[j]
+			if !sourceArray.IsNull(rowIdx) {
+				val := getNumericValue(sourceArray, rowIdx)
+				if !hasValue || val < min {
+					min = val
+					hasValue = true
+				}
+			}
+		}
+
+		if hasValue {
+			builder.Append(min)
+		} else {
+			builder.AppendNull()
+		}
+	}
+
+	return builder.NewArray(), nil
+}
+
+// RollingMaxFunc implements rolling maximum aggregation over a window of rows.
+type RollingMaxFunc struct {
+	name       string
+	columnName string
+}
+
+// RollingMax creates a new rolling maximum window function.
+func RollingMax(columnName string) *RollingMaxFunc {
+	return &RollingMaxFunc{
+		name:       fmt.Sprintf("rolling_max_%s", columnName),
+		columnName: columnName,
+	}
+}
+
+// As sets the result column name.
+func (fn *RollingMaxFunc) As(name string) *RollingMaxFunc {
+	fn.name = name
+	return fn
+}
+
+// Name returns the result column name.
+func (fn *RollingMaxFunc) Name() string {
+	return fn.name
+}
+
+// Compute calculates rolling maximum for the partition.
+func (fn *RollingMaxFunc) Compute(partition []int, df *DataFrame, ws *WindowSpec) (arrow.Array, error) {
+	series, err := df.Column(fn.columnName)
+	if err != nil {
+		return nil, fmt.Errorf("column %s not found: %w", fn.columnName, err)
+	}
+
+	sourceArray := series.Array()
+	pool := memory.NewGoAllocator()
+	builder := array.NewFloat64Builder(pool)
+	defer builder.Release()
+
+	windowSize := ws.windowSize
+	if windowSize == 0 {
+		windowSize = len(partition)
+	}
+
+	for i := range partition {
+		start := i - windowSize + 1
+		if start < 0 {
+			start = 0
+		}
+
+		var max float64
+		hasValue := false
+		for j := start; j <= i; j++ {
+			rowIdx := partition[j]
+			if !sourceArray.IsNull(rowIdx) {
+				val := getNumericValue(sourceArray, rowIdx)
+				if !hasValue || val > max {
+					max = val
+					hasValue = true
+				}
+			}
+		}
+
+		if hasValue {
+			builder.Append(max)
+		} else {
+			builder.AppendNull()
+		}
+	}
+
+	return builder.NewArray(), nil
+}
+
+// RollingCountFunc implements rolling count aggregation over a window of rows.
+type RollingCountFunc struct {
+	name       string
+	columnName string
+}
+
+// RollingCount creates a new rolling count window function.
+func RollingCount(columnName string) *RollingCountFunc {
+	return &RollingCountFunc{
+		name:       fmt.Sprintf("rolling_count_%s", columnName),
+		columnName: columnName,
+	}
+}
+
+// As sets the result column name.
+func (fn *RollingCountFunc) As(name string) *RollingCountFunc {
+	fn.name = name
+	return fn
+}
+
+// Name returns the result column name.
+func (fn *RollingCountFunc) Name() string {
+	return fn.name
+}
+
+// Compute calculates rolling count for the partition.
+func (fn *RollingCountFunc) Compute(partition []int, df *DataFrame, ws *WindowSpec) (arrow.Array, error) {
+	series, err := df.Column(fn.columnName)
+	if err != nil {
+		return nil, fmt.Errorf("column %s not found: %w", fn.columnName, err)
+	}
+
+	sourceArray := series.Array()
+	pool := memory.NewGoAllocator()
+	builder := array.NewInt64Builder(pool)
+	defer builder.Release()
+
+	windowSize := ws.windowSize
+	if windowSize == 0 {
+		windowSize = len(partition)
+	}
+
+	for i := range partition {
+		start := i - windowSize + 1
+		if start < 0 {
+			start = 0
+		}
+
+		count := int64(0)
+		for j := start; j <= i; j++ {
+			rowIdx := partition[j]
+			if !sourceArray.IsNull(rowIdx) {
+				count++
+			}
+		}
+
+		builder.Append(count)
+	}
+
+	return builder.NewArray(), nil
+}
+
+// getNumericValue extracts a numeric value from an Arrow array at the given index.
+func getNumericValue(arr arrow.Array, idx int) float64 {
+	switch typedArr := arr.(type) {
+	case *array.Int64:
+		return float64(typedArr.Value(idx))
+	case *array.Float64:
+		return typedArr.Value(idx)
+	case *array.Int32:
+		return float64(typedArr.Value(idx))
+	case *array.Float32:
+		return float64(typedArr.Value(idx))
+	case *array.Int16:
+		return float64(typedArr.Value(idx))
+	case *array.Int8:
+		return float64(typedArr.Value(idx))
+	case *array.Uint64:
+		return float64(typedArr.Value(idx))
+	case *array.Uint32:
+		return float64(typedArr.Value(idx))
+	case *array.Uint16:
+		return float64(typedArr.Value(idx))
+	case *array.Uint8:
+		return float64(typedArr.Value(idx))
+	default:
+		return 0
+	}
 }

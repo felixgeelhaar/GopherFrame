@@ -14,7 +14,7 @@ import (
 //
 // Window functions operate over a "window" of rows defined by partitioning
 // and ordering criteria. This enables analytical operations like ranking,
-// lag/lead calculations, and cumulative aggregations.
+// lag/lead calculations, rolling aggregations, and cumulative operations.
 //
 // Example:
 //
@@ -22,23 +22,34 @@ import (
 //	  PartitionBy("category").
 //	  OrderBy("date").
 //	  Over(Lag("sales", 1), RowNumber())
+//
+//	df.Window().
+//	  OrderBy("date").
+//	  Rows(7).
+//	  Over(RollingMean("sales").As("rolling_avg_7"))
 type WindowSpec struct {
 	df             *DataFrame
 	partitionCols  []string
 	orderCols      []string
 	orderAscending []bool
+	windowSize     int // Number of rows for rolling window (0 = unbounded)
 }
 
 // WindowFunc represents a window function to be applied.
 //
 // Window functions compute values based on a set of rows related to the
-// current row, such as ranking, offset access (lag/lead), or aggregation.
+// current row, such as ranking, offset access (lag/lead), rolling aggregations,
+// or cumulative operations.
 type WindowFunc interface {
 	// Name returns the result column name for this window function
 	Name() string
 
 	// Compute calculates the window function over the given partition
-	Compute(partition []int, df *DataFrame) (arrow.Array, error)
+	// Parameters:
+	//   - partition: Row indices within this partition (already sorted by OrderBy)
+	//   - df: Source DataFrame
+	//   - ws: Window specification (for accessing window size, etc.)
+	Compute(partition []int, df *DataFrame, ws *WindowSpec) (arrow.Array, error)
 }
 
 // Window initiates a window function specification.
@@ -81,6 +92,7 @@ func (df *DataFrame) Window() *WindowSpec {
 		partitionCols:  []string{},
 		orderCols:      []string{},
 		orderAscending: []bool{},
+		windowSize:     0, // 0 means unbounded (entire partition)
 	}
 }
 
@@ -164,6 +176,45 @@ func (ws *WindowSpec) OrderByDesc(cols ...string) *WindowSpec {
 	for i := range ws.orderAscending {
 		ws.orderAscending[i] = false // descending
 	}
+	return ws
+}
+
+// Rows specifies the rolling window size for window functions.
+//
+// When specified, window functions will compute values over a sliding window
+// of the specified number of rows (including the current row). This enables
+// rolling aggregations like moving averages, running sums, etc.
+//
+// The window frame is: ROWS BETWEEN (size-1) PRECEDING AND CURRENT ROW
+//
+// Parameters:
+//   - size: Number of rows in the window (including current row, must be > 0)
+//
+// Returns:
+//   - *WindowSpec: Updated window specification (builder pattern)
+//
+// Example:
+//
+//	// 7-day moving average
+//	df.Window().
+//	    OrderBy("date").
+//	    Rows(7).
+//	    Over(RollingMean("sales").As("moving_avg_7"))
+//
+//	// 3-period rolling sum by category
+//	df.Window().
+//	    PartitionBy("category").
+//	    OrderBy("date").
+//	    Rows(3).
+//	    Over(RollingSum("value").As("rolling_sum_3"))
+//
+// Note: Rows() should be used with rolling aggregation functions.
+// For unbounded windows, omit Rows() and use cumulative functions instead.
+func (ws *WindowSpec) Rows(size int) *WindowSpec {
+	if size < 1 {
+		size = 1 // minimum window size is 1
+	}
+	ws.windowSize = size
 	return ws
 }
 
@@ -435,7 +486,7 @@ func (ws *WindowSpec) computeWindowFunc(fn WindowFunc, partitions []partition, p
 		return nil, fmt.Errorf("no partitions to compute")
 	}
 
-	firstResult, err := fn.Compute(partitions[0].rows, ws.df)
+	firstResult, err := fn.Compute(partitions[0].rows, ws.df, ws)
 	if err != nil {
 		return nil, err
 	}
@@ -452,7 +503,7 @@ func (ws *WindowSpec) computeWindowFunc(fn WindowFunc, partitions []partition, p
 
 	// Compute for all partitions
 	for _, part := range partitions {
-		partResult, err := fn.Compute(part.rows, ws.df)
+		partResult, err := fn.Compute(part.rows, ws.df, ws)
 		if err != nil {
 			return nil, err
 		}

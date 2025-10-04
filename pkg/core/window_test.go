@@ -691,3 +691,408 @@ func TestDataFrame_Window_InvalidColumn(t *testing.T) {
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "column nonexistent not found")
 }
+
+// TestDataFrame_Rolling_Sum tests rolling sum aggregation.
+func TestDataFrame_Rolling_Sum(t *testing.T) {
+	pool := memory.NewGoAllocator()
+
+	// Create test data:
+	// value
+	// -----
+	// 10
+	// 20
+	// 30
+	// 40
+	// 50
+	schema := arrow.NewSchema(
+		[]arrow.Field{
+			{Name: "value", Type: arrow.PrimitiveTypes.Int64},
+		},
+		nil,
+	)
+
+	valueBuilder := array.NewInt64Builder(pool)
+	defer valueBuilder.Release()
+	valueBuilder.AppendValues([]int64{10, 20, 30, 40, 50}, nil)
+
+	record := array.NewRecord(schema, []arrow.Array{
+		valueBuilder.NewArray(),
+	}, 5)
+	defer record.Release()
+
+	df := NewDataFrame(record)
+	defer df.Release()
+
+	// Test: 3-period rolling sum
+	result, err := df.Window().
+		Rows(3).
+		Over(RollingSum("value").As("rolling_sum_3"))
+	require.NoError(t, err)
+	require.NotNil(t, result)
+	defer result.Release()
+
+	// Verify results
+	assert.Equal(t, int64(2), result.NumCols()) // value, rolling_sum_3
+	assert.Equal(t, int64(5), result.NumRows())
+
+	rollingSumSeries, err := result.Column("rolling_sum_3")
+	require.NoError(t, err)
+	rollingSumCol := rollingSumSeries.Array().(*array.Float64)
+
+	// Expected: 10, 30, 60, 90, 120
+	// Row 0: sum([10]) = 10
+	// Row 1: sum([10, 20]) = 30
+	// Row 2: sum([10, 20, 30]) = 60
+	// Row 3: sum([20, 30, 40]) = 90
+	// Row 4: sum([30, 40, 50]) = 120
+	expected := []float64{10, 30, 60, 90, 120}
+	for i := 0; i < rollingSumCol.Len(); i++ {
+		assert.Equal(t, expected[i], rollingSumCol.Value(i), "rolling_sum at index %d", i)
+	}
+}
+
+// TestDataFrame_Rolling_Mean tests rolling mean aggregation.
+func TestDataFrame_Rolling_Mean(t *testing.T) {
+	pool := memory.NewGoAllocator()
+
+	// Create test data with floats
+	schema := arrow.NewSchema(
+		[]arrow.Field{
+			{Name: "price", Type: arrow.PrimitiveTypes.Float64},
+		},
+		nil,
+	)
+
+	priceBuilder := array.NewFloat64Builder(pool)
+	defer priceBuilder.Release()
+	priceBuilder.AppendValues([]float64{10.0, 20.0, 30.0, 40.0}, nil)
+
+	record := array.NewRecord(schema, []arrow.Array{
+		priceBuilder.NewArray(),
+	}, 4)
+	defer record.Release()
+
+	df := NewDataFrame(record)
+	defer df.Release()
+
+	// Test: 2-period rolling mean
+	result, err := df.Window().
+		Rows(2).
+		Over(RollingMean("price").As("rolling_avg_2"))
+	require.NoError(t, err)
+	require.NotNil(t, result)
+	defer result.Release()
+
+	rollingMeanSeries, err := result.Column("rolling_avg_2")
+	require.NoError(t, err)
+	rollingMeanCol := rollingMeanSeries.Array().(*array.Float64)
+
+	// Expected: 10.0, 15.0, 25.0, 35.0
+	// Row 0: mean([10]) = 10.0
+	// Row 1: mean([10, 20]) = 15.0
+	// Row 2: mean([20, 30]) = 25.0
+	// Row 3: mean([30, 40]) = 35.0
+	expected := []float64{10.0, 15.0, 25.0, 35.0}
+	for i := 0; i < rollingMeanCol.Len(); i++ {
+		assert.InDelta(t, expected[i], rollingMeanCol.Value(i), 0.001, "rolling_mean at index %d", i)
+	}
+}
+
+// TestDataFrame_Rolling_MinMax tests rolling min and max aggregations.
+func TestDataFrame_Rolling_MinMax(t *testing.T) {
+	pool := memory.NewGoAllocator()
+
+	schema := arrow.NewSchema(
+		[]arrow.Field{
+			{Name: "value", Type: arrow.PrimitiveTypes.Int64},
+		},
+		nil,
+	)
+
+	valueBuilder := array.NewInt64Builder(pool)
+	defer valueBuilder.Release()
+	valueBuilder.AppendValues([]int64{5, 2, 8, 1, 9}, nil)
+
+	record := array.NewRecord(schema, []arrow.Array{
+		valueBuilder.NewArray(),
+	}, 5)
+	defer record.Release()
+
+	df := NewDataFrame(record)
+	defer df.Release()
+
+	// Test: 3-period rolling min and max
+	result, err := df.Window().
+		Rows(3).
+		Over(
+			RollingMin("value").As("rolling_min_3"),
+			RollingMax("value").As("rolling_max_3"),
+		)
+	require.NoError(t, err)
+	require.NotNil(t, result)
+	defer result.Release()
+
+	minSeries, err := result.Column("rolling_min_3")
+	require.NoError(t, err)
+	minCol := minSeries.Array().(*array.Float64)
+
+	maxSeries, err := result.Column("rolling_max_3")
+	require.NoError(t, err)
+	maxCol := maxSeries.Array().(*array.Float64)
+
+	// Expected min: 5, 2, 2, 1, 1
+	// Row 0: min([5]) = 5
+	// Row 1: min([5, 2]) = 2
+	// Row 2: min([5, 2, 8]) = 2
+	// Row 3: min([2, 8, 1]) = 1
+	// Row 4: min([8, 1, 9]) = 1
+	expectedMin := []float64{5, 2, 2, 1, 1}
+	for i := 0; i < minCol.Len(); i++ {
+		assert.Equal(t, expectedMin[i], minCol.Value(i), "rolling_min at index %d", i)
+	}
+
+	// Expected max: 5, 5, 8, 8, 9
+	// Row 0: max([5]) = 5
+	// Row 1: max([5, 2]) = 5
+	// Row 2: max([5, 2, 8]) = 8
+	// Row 3: max([2, 8, 1]) = 8
+	// Row 4: max([8, 1, 9]) = 9
+	expectedMax := []float64{5, 5, 8, 8, 9}
+	for i := 0; i < maxCol.Len(); i++ {
+		assert.Equal(t, expectedMax[i], maxCol.Value(i), "rolling_max at index %d", i)
+	}
+}
+
+// TestDataFrame_Rolling_Count tests rolling count aggregation.
+func TestDataFrame_Rolling_Count(t *testing.T) {
+	pool := memory.NewGoAllocator()
+
+	schema := arrow.NewSchema(
+		[]arrow.Field{
+			{Name: "value", Type: arrow.PrimitiveTypes.Int64},
+		},
+		nil,
+	)
+
+	valueBuilder := array.NewInt64Builder(pool)
+	defer valueBuilder.Release()
+	// Include some nulls
+	valueBuilder.AppendValues([]int64{10, 0, 30, 0, 50}, []bool{true, false, true, false, true})
+
+	record := array.NewRecord(schema, []arrow.Array{
+		valueBuilder.NewArray(),
+	}, 5)
+	defer record.Release()
+
+	df := NewDataFrame(record)
+	defer df.Release()
+
+	// Test: 3-period rolling count (counts non-null values)
+	result, err := df.Window().
+		Rows(3).
+		Over(RollingCount("value").As("rolling_count_3"))
+	require.NoError(t, err)
+	require.NotNil(t, result)
+	defer result.Release()
+
+	countSeries, err := result.Column("rolling_count_3")
+	require.NoError(t, err)
+	countCol := countSeries.Array().(*array.Int64)
+
+	// Expected: 1, 1, 2, 1, 2
+	// Row 0: count([10]) = 1
+	// Row 1: count([10, NULL]) = 1
+	// Row 2: count([10, NULL, 30]) = 2
+	// Row 3: count([NULL, 30, NULL]) = 1
+	// Row 4: count([30, NULL, 50]) = 2
+	expected := []int64{1, 1, 2, 1, 2}
+	for i := 0; i < countCol.Len(); i++ {
+		assert.Equal(t, expected[i], countCol.Value(i), "rolling_count at index %d", i)
+	}
+}
+
+// TestDataFrame_Rolling_WithPartitions tests rolling functions with partitioning.
+func TestDataFrame_Rolling_WithPartitions(t *testing.T) {
+	pool := memory.NewGoAllocator()
+
+	// Create test data with categories
+	schema := arrow.NewSchema(
+		[]arrow.Field{
+			{Name: "category", Type: arrow.BinaryTypes.String},
+			{Name: "value", Type: arrow.PrimitiveTypes.Int64},
+		},
+		nil,
+	)
+
+	categoryBuilder := array.NewStringBuilder(pool)
+	defer categoryBuilder.Release()
+	categoryBuilder.AppendValues([]string{"A", "A", "A", "B", "B", "B"}, nil)
+
+	valueBuilder := array.NewInt64Builder(pool)
+	defer valueBuilder.Release()
+	valueBuilder.AppendValues([]int64{10, 20, 30, 100, 200, 300}, nil)
+
+	record := array.NewRecord(schema, []arrow.Array{
+		categoryBuilder.NewArray(),
+		valueBuilder.NewArray(),
+	}, 6)
+	defer record.Release()
+
+	df := NewDataFrame(record)
+	defer df.Release()
+
+	// Test: 2-period rolling sum within each category
+	result, err := df.Window().
+		PartitionBy("category").
+		Rows(2).
+		Over(RollingSum("value").As("rolling_sum_2"))
+	require.NoError(t, err)
+	require.NotNil(t, result)
+	defer result.Release()
+
+	rollingSumSeries, err := result.Column("rolling_sum_2")
+	require.NoError(t, err)
+	rollingSumCol := rollingSumSeries.Array().(*array.Float64)
+
+	// Expected (partitions reset):
+	// Category A: [10], [10,20], [20,30] = 10, 30, 50
+	// Category B: [100], [100,200], [200,300] = 100, 300, 500
+	expected := []float64{10, 30, 50, 100, 300, 500}
+	for i := 0; i < rollingSumCol.Len(); i++ {
+		assert.Equal(t, expected[i], rollingSumCol.Value(i), "rolling_sum at index %d", i)
+	}
+}
+
+// TestDataFrame_Rolling_WithOrdering tests rolling functions with ordering.
+func TestDataFrame_Rolling_WithOrdering(t *testing.T) {
+	pool := memory.NewGoAllocator()
+
+	// Create test data
+	schema := arrow.NewSchema(
+		[]arrow.Field{
+			{Name: "date", Type: arrow.BinaryTypes.String},
+			{Name: "sales", Type: arrow.PrimitiveTypes.Int64},
+		},
+		nil,
+	)
+
+	dateBuilder := array.NewStringBuilder(pool)
+	defer dateBuilder.Release()
+	// Intentionally unordered
+	dateBuilder.AppendValues([]string{"2024-03", "2024-01", "2024-04", "2024-02"}, nil)
+
+	salesBuilder := array.NewInt64Builder(pool)
+	defer salesBuilder.Release()
+	salesBuilder.AppendValues([]int64{300, 100, 400, 200}, nil)
+
+	record := array.NewRecord(schema, []arrow.Array{
+		dateBuilder.NewArray(),
+		salesBuilder.NewArray(),
+	}, 4)
+	defer record.Release()
+
+	df := NewDataFrame(record)
+	defer df.Release()
+
+	// Test: 2-period rolling sum with ordering by date
+	result, err := df.Window().
+		OrderBy("date").
+		Rows(2).
+		Over(RollingSum("sales").As("rolling_sum_2"))
+	require.NoError(t, err)
+	require.NotNil(t, result)
+	defer result.Release()
+
+	rollingSumSeries, err := result.Column("rolling_sum_2")
+	require.NoError(t, err)
+	rollingSumCol := rollingSumSeries.Array().(*array.Float64)
+
+	// Original order: 2024-03(300), 2024-01(100), 2024-04(400), 2024-02(200)
+	// Sorted order: 2024-01(100), 2024-02(200), 2024-03(300), 2024-04(400)
+	// Rolling sums in sorted order: 100, 300, 500, 700
+	// Mapped back to original order:
+	// Row 0 (2024-03): 500
+	// Row 1 (2024-01): 100
+	// Row 2 (2024-04): 700
+	// Row 3 (2024-02): 300
+	expected := []float64{500, 100, 700, 300}
+	for i := 0; i < rollingSumCol.Len(); i++ {
+		assert.Equal(t, expected[i], rollingSumCol.Value(i), "rolling_sum at index %d", i)
+	}
+}
+
+// TestDataFrame_Rolling_UnboundedWindow tests rolling functions without Rows() (unbounded).
+func TestDataFrame_Rolling_UnboundedWindow(t *testing.T) {
+	pool := memory.NewGoAllocator()
+
+	schema := arrow.NewSchema(
+		[]arrow.Field{
+			{Name: "value", Type: arrow.PrimitiveTypes.Int64},
+		},
+		nil,
+	)
+
+	valueBuilder := array.NewInt64Builder(pool)
+	defer valueBuilder.Release()
+	valueBuilder.AppendValues([]int64{10, 20, 30}, nil)
+
+	record := array.NewRecord(schema, []arrow.Array{
+		valueBuilder.NewArray(),
+	}, 3)
+	defer record.Release()
+
+	df := NewDataFrame(record)
+	defer df.Release()
+
+	// Test: Rolling sum without Rows() = unbounded (entire partition)
+	result, err := df.Window().
+		Over(RollingSum("value").As("cumsum"))
+	require.NoError(t, err)
+	require.NotNil(t, result)
+	defer result.Release()
+
+	cumsumSeries, err := result.Column("cumsum")
+	require.NoError(t, err)
+	cumsumCol := cumsumSeries.Array().(*array.Float64)
+
+	// Expected: cumulative sum (unbounded window)
+	// 10, 30, 60
+	expected := []float64{10, 30, 60}
+	for i := 0; i < cumsumCol.Len(); i++ {
+		assert.Equal(t, expected[i], cumsumCol.Value(i), "cumsum at index %d", i)
+	}
+}
+
+// TestDataFrame_Rolling_EmptyDataFrame tests rolling functions on empty DataFrame.
+func TestDataFrame_Rolling_EmptyDataFrame(t *testing.T) {
+	pool := memory.NewGoAllocator()
+
+	schema := arrow.NewSchema(
+		[]arrow.Field{
+			{Name: "value", Type: arrow.PrimitiveTypes.Int64},
+		},
+		nil,
+	)
+
+	valueBuilder := array.NewInt64Builder(pool)
+	defer valueBuilder.Release()
+
+	record := array.NewRecord(schema, []arrow.Array{
+		valueBuilder.NewArray(),
+	}, 0)
+	defer record.Release()
+
+	df := NewDataFrame(record)
+	defer df.Release()
+
+	// Test: Rolling sum on empty DataFrame
+	result, err := df.Window().
+		Rows(3).
+		Over(RollingSum("value").As("rolling_sum"))
+	require.NoError(t, err)
+	require.NotNil(t, result)
+	defer result.Release()
+
+	assert.Equal(t, int64(2), result.NumCols())
+	assert.Equal(t, int64(0), result.NumRows())
+}
