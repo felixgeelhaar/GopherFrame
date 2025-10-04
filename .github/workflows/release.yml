@@ -17,7 +17,7 @@ jobs:
     - name: Set up Go
       uses: actions/setup-go@v5
       with:
-        go-version: '1.23'
+        go-version: '1.24'
 
     - name: Cache Go modules
       uses: actions/cache@v3
@@ -51,7 +51,7 @@ jobs:
     - name: Set up Go
       uses: actions/setup-go@v5
       with:
-        go-version: '1.23'
+        go-version: '1.24'
 
     - name: Cache Go modules
       uses: actions/cache@v3
@@ -63,7 +63,7 @@ jobs:
       run: go mod download
 
     - name: Run comprehensive demo
-      run: go run cmd/examples/complete_demo.go
+      run: go run cmd/examples/complete_demo/main.go
 
     - name: Generate release notes
       id: release_notes
@@ -100,11 +100,11 @@ jobs:
     - name: Set up Go
       uses: actions/setup-go@v5
       with:
-        go-version: '1.23'
+        go-version: '1.24'
 
     - name: Verify module can be downloaded
       run: |
         cd $(mktemp -d)
         go mod init test
-        go get github.com/felixgeelhaar/GopherFrame@${{ github.ref_name }}
-        go list -m github.com/felixgeelhaar/GopherFrame
+        go get github.com/felixgeelhaar/gopherframe@${{ github.ref_name }}
+        go list -m github.com/felixgeelhaar/gopherframe

@@ -45,9 +45,17 @@ jobs:
 
     - name: Run tests
       run: |
-        go test -v -race -coverprofile=coverage.out ./...
+        # Run all tests including examples
+        go test -v -race ./...
         if [ $? -ne 0 ]; then
           echo "❌ Tests failed!"
+          exit 1
+        fi
+
+        # Generate coverage only for pkg/ (exclude examples and cmd/)
+        go test -v -race -coverprofile=coverage.out ./pkg/...
+        if [ $? -ne 0 ]; then
+          echo "❌ Coverage generation failed!"
           exit 1
         fi
 
@@ -61,12 +69,12 @@ jobs:
 
     - name: Check test coverage threshold
       run: |
-        # Calculate overall coverage percentage
+        # Calculate coverage percentage for pkg/ (examples excluded)
         COVERAGE=$(go tool cover -func=coverage.out | grep total | awk '{print $3}' | sed 's/%//')
-        echo "📊 Current test coverage: ${COVERAGE}%"
+        echo "📊 Current test coverage (pkg/): ${COVERAGE}%"
 
-        # Set minimum coverage threshold (70% for now, targeting 90%+ for v1.0)
-        THRESHOLD=70
+        # Set minimum coverage threshold (80% for production code)
+        THRESHOLD=80
 
         # Compare coverage to threshold
         if (( $(echo "$COVERAGE < $THRESHOLD" | bc -l) )); then
