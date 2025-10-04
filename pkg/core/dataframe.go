@@ -1283,6 +1283,20 @@ const (
 	// the right DataFrame. Rows from the left without matches have null values for
 	// right DataFrame columns.
 	LeftJoin
+
+	// RightJoin includes all rows from the right DataFrame, with matching rows from
+	// the left DataFrame. Rows from the right without matches have null values for
+	// left DataFrame columns.
+	RightJoin
+
+	// FullOuterJoin includes all rows from both DataFrames. Rows without matches
+	// in either DataFrame have null values for the non-matching side's columns.
+	FullOuterJoin
+
+	// CrossJoin produces the Cartesian product of both DataFrames, combining every
+	// row from the left DataFrame with every row from the right DataFrame.
+	// No join keys are required for CrossJoin.
+	CrossJoin
 )
 
 // String returns the string representation of JoinType for debugging.
@@ -1298,6 +1312,12 @@ func (jt JoinType) String() string {
 		return "InnerJoin"
 	case LeftJoin:
 		return "LeftJoin"
+	case RightJoin:
+		return "RightJoin"
+	case FullOuterJoin:
+		return "FullOuterJoin"
+	case CrossJoin:
+		return "CrossJoin"
 	default:
 		return fmt.Sprintf("JoinType(%d)", jt)
 	}
@@ -1346,7 +1366,12 @@ func (df *DataFrame) Join(other *DataFrame, leftKey, rightKey string, joinType J
 		return nil, fmt.Errorf("other DataFrame cannot be nil")
 	}
 
-	// Validate join keys exist
+	// CrossJoin doesn't use join keys, so skip validation
+	if joinType == CrossJoin {
+		return df.performCrossJoin(other, leftKey, rightKey)
+	}
+
+	// Validate join keys exist (for all join types except CrossJoin)
 	if !df.HasColumn(leftKey) {
 		return nil, fmt.Errorf("left join key column not found: %s", leftKey)
 	}
@@ -1364,6 +1389,10 @@ func (df *DataFrame) Join(other *DataFrame, leftKey, rightKey string, joinType J
 		return df.performInnerJoin(other, leftKey, rightKey, leftKeyArray, rightKeyArray)
 	case LeftJoin:
 		return df.performLeftJoin(other, leftKey, rightKey, leftKeyArray, rightKeyArray)
+	case RightJoin:
+		return df.performRightJoin(other, leftKey, rightKey, leftKeyArray, rightKeyArray)
+	case FullOuterJoin:
+		return df.performFullOuterJoin(other, leftKey, rightKey, leftKeyArray, rightKeyArray)
 	default:
 		return nil, fmt.Errorf("unsupported join type: %d", joinType)
 	}
@@ -1435,6 +1464,112 @@ func (df *DataFrame) InnerJoin(other *DataFrame, leftKey, rightKey string) (*Dat
 // See also: Join for explicit join type, InnerJoin for inner join
 func (df *DataFrame) LeftJoin(other *DataFrame, leftKey, rightKey string) (*DataFrame, error) {
 	return df.Join(other, leftKey, rightKey, LeftJoin)
+}
+
+// RightJoin performs a right outer join with another DataFrame.
+//
+// This is a convenience method that delegates to Join() with RightJoin type.
+// A right join returns all rows from the right DataFrame, with matching rows from
+// the left DataFrame. Rows from the right without matches have null values for
+// all left DataFrame columns.
+//
+// Parameters:
+//   - other: DataFrame to join with (right side)
+//   - leftKey: Column name in this DataFrame to join on
+//   - rightKey: Column name in other DataFrame to join on
+//
+// Returns:
+//   - *DataFrame: New DataFrame with all right rows and matching left rows
+//   - error: Returns error if other is nil, join keys not found, or join fails
+//
+// Memory: Caller must call Release() on the returned DataFrame
+//
+// Example:
+//
+//	// Get all orders with customer information (including orders without customers)
+//	result, err := customers.RightJoin(orders, "id", "customer_id")
+//	if err != nil {
+//	    log.Fatal(err)
+//	}
+//	defer result.Release()
+//	// Orders without customers will have null values in customer columns
+//
+// Complexity: O(n+m) where n=left rows, m=right rows (hash join)
+//
+// See also: Join for explicit join type, LeftJoin for left outer join
+func (df *DataFrame) RightJoin(other *DataFrame, leftKey, rightKey string) (*DataFrame, error) {
+	return df.Join(other, leftKey, rightKey, RightJoin)
+}
+
+// FullOuterJoin performs a full outer join with another DataFrame.
+//
+// This is a convenience method that delegates to Join() with FullOuterJoin type.
+// A full outer join returns all rows from both DataFrames. Rows without matches
+// in either DataFrame have null values for the non-matching side's columns.
+//
+// Parameters:
+//   - other: DataFrame to join with (right side)
+//   - leftKey: Column name in this DataFrame to join on
+//   - rightKey: Column name in other DataFrame to join on
+//
+// Returns:
+//   - *DataFrame: New DataFrame with all rows from both DataFrames
+//   - error: Returns error if other is nil, join keys not found, or join fails
+//
+// Memory: Caller must call Release() on the returned DataFrame
+//
+// Example:
+//
+//	// Get all users and orders, matched where possible
+//	result, err := users.FullOuterJoin(orders, "id", "user_id")
+//	if err != nil {
+//	    log.Fatal(err)
+//	}
+//	defer result.Release()
+//	// Both unmatched users and unmatched orders will be included with nulls
+//
+// Complexity: O(n+m) where n=left rows, m=right rows (hash join)
+//
+// See also: Join for explicit join type, LeftJoin, RightJoin
+func (df *DataFrame) FullOuterJoin(other *DataFrame, leftKey, rightKey string) (*DataFrame, error) {
+	return df.Join(other, leftKey, rightKey, FullOuterJoin)
+}
+
+// CrossJoin performs a cross join (Cartesian product) with another DataFrame.
+//
+// This is a convenience method that delegates to Join() with CrossJoin type.
+// A cross join produces every possible combination of rows from both DataFrames.
+// No join keys are required or used - the provided keys are ignored.
+//
+// WARNING: Cross joins can produce very large result sets. The result size is
+// left_rows × right_rows. Use with caution on large DataFrames.
+//
+// Parameters:
+//   - other: DataFrame to join with (right side)
+//   - leftKey: Column name (ignored for cross join, pass empty string)
+//   - rightKey: Column name (ignored for cross join, pass empty string)
+//
+// Returns:
+//   - *DataFrame: New DataFrame with Cartesian product of both DataFrames
+//   - error: Returns error if other is nil or result exceeds 2 billion rows
+//
+// Memory: Caller must call Release() on the returned DataFrame
+//
+// Example:
+//
+//	// Generate all combinations of products and colors
+//	result, err := products.CrossJoin(colors, "", "")
+//	if err != nil {
+//	    log.Fatal(err)
+//	}
+//	defer result.Release()
+//	// Result has products.NumRows() × colors.NumRows() rows
+//
+// Complexity: O(n*m) where n=left rows, m=right rows (Cartesian product)
+//
+// See also: Join for explicit join type, InnerJoin for key-based joining
+func (df *DataFrame) CrossJoin(other *DataFrame, leftKey, rightKey string) (*DataFrame, error) {
+	return df.Join(other, leftKey, rightKey, CrossJoin)
 }
 
 // getColumnIndex returns the index of a column by name
@@ -1534,6 +1669,232 @@ func (df *DataFrame) performLeftJoin(other *DataFrame, leftKey, rightKey string,
 	}
 
 	return df.buildJoinResult(other, leftKey, rightKey, leftIndices, rightIndices, true)
+}
+
+// performRightJoin implements the right join logic
+//
+// A right join is equivalent to a left join with the DataFrames swapped.
+// All rows from the right DataFrame are included, with matching rows from the left.
+// Unmatched right rows have null values for left DataFrame columns.
+func (df *DataFrame) performRightJoin(other *DataFrame, leftKey, rightKey string, leftKeyArray, rightKeyArray arrow.Array) (*DataFrame, error) {
+	// Build hash map from left DataFrame
+	leftHashMap := make(map[interface{}][]int)
+
+	for i := 0; i < leftKeyArray.Len(); i++ {
+		if leftKeyArray.IsNull(i) {
+			continue
+		}
+
+		key := extractValue(leftKeyArray, i)
+		if key != nil {
+			leftHashMap[key] = append(leftHashMap[key], i)
+		}
+	}
+
+	// Find matching rows, including unmatched right rows
+	var leftIndices, rightIndices []int
+	for i := 0; i < rightKeyArray.Len(); i++ {
+		if rightKeyArray.IsNull(i) {
+			// Include right row with null values for left side
+			leftIndices = append(leftIndices, -1) // -1 indicates no match
+			rightIndices = append(rightIndices, i)
+			continue
+		}
+
+		rightValue := extractValue(rightKeyArray, i)
+		if rightValue == nil {
+			leftIndices = append(leftIndices, -1)
+			rightIndices = append(rightIndices, i)
+			continue
+		}
+
+		if leftRows, exists := leftHashMap[rightValue]; exists {
+			for _, leftRow := range leftRows {
+				leftIndices = append(leftIndices, leftRow)
+				rightIndices = append(rightIndices, i)
+			}
+		} else {
+			// No match found, include right row with nulls for left side
+			leftIndices = append(leftIndices, -1)
+			rightIndices = append(rightIndices, i)
+		}
+	}
+
+	return df.buildJoinResult(other, leftKey, rightKey, leftIndices, rightIndices, true)
+}
+
+// performFullOuterJoin implements the full outer join logic
+//
+// A full outer join includes all rows from both DataFrames. Rows without matches
+// in either DataFrame have null values for the non-matching side's columns.
+// This is implemented as a union of left join and right join results.
+func (df *DataFrame) performFullOuterJoin(other *DataFrame, leftKey, rightKey string, leftKeyArray, rightKeyArray arrow.Array) (*DataFrame, error) {
+	// Build hash maps for both sides
+	leftHashMap := make(map[interface{}][]int)
+	rightHashMap := make(map[interface{}][]int)
+	matchedRightRows := make(map[int]bool)
+
+	for i := 0; i < leftKeyArray.Len(); i++ {
+		if leftKeyArray.IsNull(i) {
+			continue
+		}
+		key := extractValue(leftKeyArray, i)
+		if key != nil {
+			leftHashMap[key] = append(leftHashMap[key], i)
+		}
+	}
+
+	for i := 0; i < rightKeyArray.Len(); i++ {
+		if rightKeyArray.IsNull(i) {
+			continue
+		}
+		key := extractValue(rightKeyArray, i)
+		if key != nil {
+			rightHashMap[key] = append(rightHashMap[key], i)
+		}
+	}
+
+	var leftIndices, rightIndices []int
+
+	// First pass: Include all left rows (with or without matches)
+	for i := 0; i < leftKeyArray.Len(); i++ {
+		if leftKeyArray.IsNull(i) {
+			leftIndices = append(leftIndices, i)
+			rightIndices = append(rightIndices, -1)
+			continue
+		}
+
+		leftValue := extractValue(leftKeyArray, i)
+		if leftValue == nil {
+			leftIndices = append(leftIndices, i)
+			rightIndices = append(rightIndices, -1)
+			continue
+		}
+
+		if rightRows, exists := rightHashMap[leftValue]; exists {
+			for _, rightRow := range rightRows {
+				leftIndices = append(leftIndices, i)
+				rightIndices = append(rightIndices, rightRow)
+				matchedRightRows[rightRow] = true
+			}
+		} else {
+			leftIndices = append(leftIndices, i)
+			rightIndices = append(rightIndices, -1)
+		}
+	}
+
+	// Second pass: Include unmatched right rows
+	for i := 0; i < rightKeyArray.Len(); i++ {
+		if !matchedRightRows[i] {
+			leftIndices = append(leftIndices, -1)
+			rightIndices = append(rightIndices, i)
+		}
+	}
+
+	return df.buildJoinResult(other, leftKey, rightKey, leftIndices, rightIndices, true)
+}
+
+// performCrossJoin implements the cross join logic
+//
+// A cross join produces the Cartesian product of both DataFrames, combining every
+// row from the left DataFrame with every row from the right DataFrame.
+// No join keys are used - they are ignored.
+func (df *DataFrame) performCrossJoin(other *DataFrame, leftKey, rightKey string) (*DataFrame, error) {
+	leftRows := int(df.record.NumRows())
+	rightRows := int(other.record.NumRows())
+
+	// Calculate total result rows (Cartesian product)
+	totalRows := int64(leftRows) * int64(rightRows)
+	if totalRows > 1<<31-1 { // Check for overflow (max int32)
+		return nil, fmt.Errorf("cross join result too large: %d rows (exceeds 2 billion)", totalRows)
+	}
+
+	// Build index arrays for Cartesian product
+	var leftIndices, rightIndices []int
+	leftIndices = make([]int, 0, int(totalRows))
+	rightIndices = make([]int, 0, int(totalRows))
+
+	for i := 0; i < leftRows; i++ {
+		for j := 0; j < rightRows; j++ {
+			leftIndices = append(leftIndices, i)
+			rightIndices = append(rightIndices, j)
+		}
+	}
+
+	// For cross join, we don't use join keys, so pass empty strings
+	// and build result without key filtering
+	return df.buildCrossJoinResult(other, leftIndices, rightIndices)
+}
+
+// buildCrossJoinResult constructs the final cross join DataFrame
+//
+// This is separate from buildJoinResult because cross joins don't have join keys
+// to exclude from the result schema.
+func (df *DataFrame) buildCrossJoinResult(other *DataFrame, leftIndices, rightIndices []int) (*DataFrame, error) {
+	if len(leftIndices) != len(rightIndices) {
+		return nil, fmt.Errorf("internal error: index arrays length mismatch")
+	}
+
+	leftSchema := df.record.Schema()
+	rightSchema := other.record.Schema()
+
+	// Build result schema (all columns from both DataFrames)
+	var fields []arrow.Field
+	columnNameMap := make(map[string]bool)
+
+	// Add all left columns
+	for i := 0; i < leftSchema.NumFields(); i++ {
+		field := leftSchema.Field(i)
+		fields = append(fields, field)
+		columnNameMap[field.Name] = true
+	}
+
+	// Add all right columns (with conflict resolution)
+	for i := 0; i < rightSchema.NumFields(); i++ {
+		field := rightSchema.Field(i)
+		fieldName := field.Name
+
+		// Resolve column name conflicts
+		if columnNameMap[fieldName] {
+			fieldName = "right_" + fieldName
+		}
+
+		fields = append(fields, arrow.Field{
+			Name:     fieldName,
+			Type:     field.Type,
+			Nullable: true, // Always nullable in joins
+		})
+	}
+
+	resultSchema := arrow.NewSchema(fields, nil)
+	pool := df.allocator
+
+	// Build arrays for each column
+	var resultArrays []arrow.Array
+
+	// Left columns
+	for i := 0; i < leftSchema.NumFields(); i++ {
+		sourceArray := df.record.Column(i)
+		resultArray := df.buildJoinedArray(pool, sourceArray, leftIndices, sourceArray.DataType(), false, int(df.record.NumRows()))
+		resultArrays = append(resultArrays, resultArray)
+	}
+
+	// Right columns
+	for i := 0; i < rightSchema.NumFields(); i++ {
+		sourceArray := other.record.Column(i)
+		resultArray := df.buildJoinedArray(pool, sourceArray, rightIndices, sourceArray.DataType(), false, int(other.record.NumRows()))
+		resultArrays = append(resultArrays, resultArray)
+	}
+
+	// Create result record
+	resultRecord := array.NewRecord(resultSchema, resultArrays, int64(len(leftIndices)))
+
+	// Release intermediate arrays
+	for _, arr := range resultArrays {
+		arr.Release()
+	}
+
+	return NewDataFrameWithAllocator(resultRecord, pool), nil
 }
 
 // extractValue extracts a comparable value from an Arrow array at given index
