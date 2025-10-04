@@ -11,18 +11,19 @@ GopherFrame aims to become the production-grade DataFrame library for Go. This r
 
 ## Phase 0: Critical Stabilization ✅
 **Duration**: Week 1-2 (COMPLETED)
-**Status**: All critical blockers resolved
+**Status**: All critical blockers resolved and coverage targets exceeded
 
 ### Completed
 - ✅ Fixed join implementation panic (non-deterministic map iteration bug)
 - ✅ Updated documentation for honest status (README.md, CLAUDE.md)
 - ✅ All tests passing
-
-### Remaining
-- [ ] Increase test coverage: pkg/core (50.5% → 80%+), pkg/expr (66.3% → 80%+)
-- [ ] Add test failure blocking to CI
-- [ ] Remove duplicate coverage files
-- [ ] Create comprehensive join test suite
+- ✅ Increased test coverage: pkg/core (50.5% → 82.0%), pkg/expr (66.3% → 86.4%)
+- ✅ Added test failure blocking to CI (.github/workflows/ci.yml)
+- ✅ Removed duplicate coverage files
+- ✅ Created comprehensive join test suite (InnerJoin, LeftJoin with edge cases)
+- ✅ Added comprehensive storage and singleRecordReader tests
+- ✅ Added comprehensive Series method tests
+- ✅ Added string operation tests (Contains, StartsWith, EndsWith)
 
 ---
 
