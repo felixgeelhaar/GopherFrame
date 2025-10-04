@@ -16,6 +16,11 @@ import (
 // DataFrame is the internal, immutable representation of tabular data.
 // It wraps an arrow.Record to provide zero-copy operations and seamless
 // interoperability with the Arrow ecosystem.
+//
+// Thread Safety: DataFrame is immutable and safe for concurrent reads.
+// All transformation methods return new DataFrame instances without modifying
+// the original. However, Release() is not thread-safe and should only be called
+// when you're certain no other goroutines are using the DataFrame.
 type DataFrame struct {
 	// record is the underlying Arrow Record containing the actual data.
 	// This is never exposed directly to maintain immutability.
@@ -788,6 +793,10 @@ func (df *DataFrame) stableSort(indices []int, less func(i, j int) bool) {
 
 // Release decrements the reference count of the underlying Arrow Record.
 // The DataFrame should not be used after calling Release().
+// It is safe to call Release multiple times.
+//
+// Thread Safety: Release() is NOT thread-safe. Only call Release() when you're
+// certain no other goroutines are accessing this DataFrame.
 func (df *DataFrame) Release() {
 	if df.record != nil {
 		df.record.Release()

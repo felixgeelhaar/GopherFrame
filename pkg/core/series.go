@@ -12,6 +12,11 @@ import (
 // Series represents an immutable, one-dimensional array of data.
 // It wraps an Arrow Array to provide type-safe operations and
 // seamless interoperability with the Arrow ecosystem.
+//
+// Thread Safety: Series is immutable and safe for concurrent reads.
+// All transformation methods return new Series instances without modifying
+// the original. However, Release() is not thread-safe and should only be called
+// when you're certain no other goroutines are using the Series.
 type Series struct {
 	// array is the underlying Arrow Array containing the actual data.
 	array arrow.Array
@@ -328,6 +333,10 @@ func (s *Series) Tail(n int) (*Series, error) {
 
 // Release decrements the reference count of the underlying Arrow Array.
 // The Series should not be used after calling Release().
+// It is safe to call Release multiple times.
+//
+// Thread Safety: Release() is NOT thread-safe. Only call Release() when you're
+// certain no other goroutines are accessing this Series.
 func (s *Series) Release() {
 	if s.array != nil {
 		s.array.Release()
