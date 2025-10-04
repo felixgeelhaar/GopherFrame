@@ -5,6 +5,7 @@ package expr
 
 import (
 	"fmt"
+	"regexp"
 	"strings"
 	"time"
 
@@ -38,6 +39,13 @@ type Expr interface {
 	Contains(substring Expr) Expr
 	StartsWith(prefix Expr) Expr
 	EndsWith(suffix Expr) Expr
+	Upper() Expr
+	Lower() Expr
+	Trim() Expr
+	TrimLeft() Expr
+	TrimRight() Expr
+	Length() Expr
+	Match(pattern Expr) Expr
 
 	// Temporal methods
 	Year() Expr
@@ -142,6 +150,41 @@ func (c *ColumnExpr) StartsWith(prefix Expr) Expr {
 // EndsWith creates a binary expression that tests if this string column ends with a suffix.
 func (c *ColumnExpr) EndsWith(suffix Expr) Expr {
 	return NewBinaryExpr(c, suffix, "ends_with")
+}
+
+// Upper converts string to uppercase.
+func (c *ColumnExpr) Upper() Expr {
+	return NewUnaryExpr(c, "upper")
+}
+
+// Lower converts string to lowercase.
+func (c *ColumnExpr) Lower() Expr {
+	return NewUnaryExpr(c, "lower")
+}
+
+// Trim removes leading and trailing whitespace.
+func (c *ColumnExpr) Trim() Expr {
+	return NewUnaryExpr(c, "trim")
+}
+
+// TrimLeft removes leading whitespace.
+func (c *ColumnExpr) TrimLeft() Expr {
+	return NewUnaryExpr(c, "trim_left")
+}
+
+// TrimRight removes trailing whitespace.
+func (c *ColumnExpr) TrimRight() Expr {
+	return NewUnaryExpr(c, "trim_right")
+}
+
+// Length returns the length of the string.
+func (c *ColumnExpr) Length() Expr {
+	return NewUnaryExpr(c, "length")
+}
+
+// Match tests if string matches a regular expression pattern.
+func (c *ColumnExpr) Match(pattern Expr) Expr {
+	return NewBinaryExpr(c, pattern, "match")
 }
 
 // Temporal operations for ColumnExpr
@@ -366,6 +409,34 @@ func (l *LiteralExpr) EndsWith(suffix Expr) Expr {
 	return NewBinaryExpr(l, suffix, "ends_with")
 }
 
+func (l *LiteralExpr) Upper() Expr {
+	return NewUnaryExpr(l, "upper")
+}
+
+func (l *LiteralExpr) Lower() Expr {
+	return NewUnaryExpr(l, "lower")
+}
+
+func (l *LiteralExpr) Trim() Expr {
+	return NewUnaryExpr(l, "trim")
+}
+
+func (l *LiteralExpr) TrimLeft() Expr {
+	return NewUnaryExpr(l, "trim_left")
+}
+
+func (l *LiteralExpr) TrimRight() Expr {
+	return NewUnaryExpr(l, "trim_right")
+}
+
+func (l *LiteralExpr) Length() Expr {
+	return NewUnaryExpr(l, "length")
+}
+
+func (l *LiteralExpr) Match(pattern Expr) Expr {
+	return NewBinaryExpr(l, pattern, "match")
+}
+
 // Temporal methods for literals
 func (l *LiteralExpr) Year() Expr {
 	return NewUnaryExpr(l, "year")
@@ -476,6 +547,8 @@ func (b *BinaryExpr) Evaluate(df *core.DataFrame) (arrow.Array, error) {
 		return b.evaluateStartsWith(leftArray, rightArray)
 	case "ends_with":
 		return b.evaluateEndsWith(leftArray, rightArray)
+	case "match":
+		return b.evaluateMatch(leftArray, rightArray)
 	case "add_days":
 		return b.evaluateAddDays(leftArray, rightArray)
 	case "add_hours":
@@ -878,6 +951,34 @@ func (b *BinaryExpr) EndsWith(suffix Expr) Expr {
 	return NewBinaryExpr(b, suffix, "ends_with")
 }
 
+func (b *BinaryExpr) Upper() Expr {
+	return NewUnaryExpr(b, "upper")
+}
+
+func (b *BinaryExpr) Lower() Expr {
+	return NewUnaryExpr(b, "lower")
+}
+
+func (b *BinaryExpr) Trim() Expr {
+	return NewUnaryExpr(b, "trim")
+}
+
+func (b *BinaryExpr) TrimLeft() Expr {
+	return NewUnaryExpr(b, "trim_left")
+}
+
+func (b *BinaryExpr) TrimRight() Expr {
+	return NewUnaryExpr(b, "trim_right")
+}
+
+func (b *BinaryExpr) Length() Expr {
+	return NewUnaryExpr(b, "length")
+}
+
+func (b *BinaryExpr) Match(pattern Expr) Expr {
+	return NewBinaryExpr(b, pattern, "match")
+}
+
 // Temporal methods for binary expressions
 func (b *BinaryExpr) Year() Expr {
 	return NewUnaryExpr(b, "year")
@@ -1097,6 +1198,18 @@ func (u *UnaryExpr) Evaluate(df *core.DataFrame) (arrow.Array, error) {
 		return u.evaluateTruncateToDay(operandArray)
 	case "trunc_hour":
 		return u.evaluateTruncateToHour(operandArray)
+	case "upper":
+		return u.evaluateUpper(operandArray)
+	case "lower":
+		return u.evaluateLower(operandArray)
+	case "trim":
+		return u.evaluateTrim(operandArray)
+	case "trim_left":
+		return u.evaluateTrimLeft(operandArray)
+	case "trim_right":
+		return u.evaluateTrimRight(operandArray)
+	case "length":
+		return u.evaluateLength(operandArray)
 	default:
 		return nil, fmt.Errorf("unsupported unary operator: %s", u.operator)
 	}
@@ -1152,6 +1265,34 @@ func (u *UnaryExpr) StartsWith(prefix Expr) Expr {
 
 func (u *UnaryExpr) EndsWith(suffix Expr) Expr {
 	return NewBinaryExpr(u, suffix, "ends_with")
+}
+
+func (u *UnaryExpr) Upper() Expr {
+	return NewUnaryExpr(u, "upper")
+}
+
+func (u *UnaryExpr) Lower() Expr {
+	return NewUnaryExpr(u, "lower")
+}
+
+func (u *UnaryExpr) Trim() Expr {
+	return NewUnaryExpr(u, "trim")
+}
+
+func (u *UnaryExpr) TrimLeft() Expr {
+	return NewUnaryExpr(u, "trim_left")
+}
+
+func (u *UnaryExpr) TrimRight() Expr {
+	return NewUnaryExpr(u, "trim_right")
+}
+
+func (u *UnaryExpr) Length() Expr {
+	return NewUnaryExpr(u, "length")
+}
+
+func (u *UnaryExpr) Match(pattern Expr) Expr {
+	return NewBinaryExpr(u, pattern, "match")
 }
 
 // Temporal methods for UnaryExpr
@@ -1728,6 +1869,195 @@ func (b *BinaryExpr) evaluateAddSeconds(left, right arrow.Array) (arrow.Array, e
 				return nil, fmt.Errorf("failed to convert time to timestamp: %w", err)
 			}
 			builder.Append(ts)
+		}
+	}
+
+	return builder.NewArray(), nil
+}
+
+// ====================
+// String Operations
+// ====================
+
+// evaluateUpper converts strings to uppercase
+func (u *UnaryExpr) evaluateUpper(arr arrow.Array) (arrow.Array, error) {
+	if arr.DataType().ID() != arrow.STRING {
+		return nil, fmt.Errorf("upper operation requires string type, got %s", arr.DataType())
+	}
+
+	strArray := arr.(*array.String)
+	pool := memory.NewGoAllocator()
+	builder := array.NewStringBuilder(pool)
+	defer builder.Release()
+
+	for i := 0; i < arr.Len(); i++ {
+		if strArray.IsNull(i) {
+			builder.AppendNull()
+		} else {
+			builder.Append(strings.ToUpper(strArray.Value(i)))
+		}
+	}
+
+	return builder.NewArray(), nil
+}
+
+// evaluateLower converts strings to lowercase
+func (u *UnaryExpr) evaluateLower(arr arrow.Array) (arrow.Array, error) {
+	if arr.DataType().ID() != arrow.STRING {
+		return nil, fmt.Errorf("lower operation requires string type, got %s", arr.DataType())
+	}
+
+	strArray := arr.(*array.String)
+	pool := memory.NewGoAllocator()
+	builder := array.NewStringBuilder(pool)
+	defer builder.Release()
+
+	for i := 0; i < arr.Len(); i++ {
+		if strArray.IsNull(i) {
+			builder.AppendNull()
+		} else {
+			builder.Append(strings.ToLower(strArray.Value(i)))
+		}
+	}
+
+	return builder.NewArray(), nil
+}
+
+// evaluateTrim removes leading and trailing whitespace
+func (u *UnaryExpr) evaluateTrim(arr arrow.Array) (arrow.Array, error) {
+	if arr.DataType().ID() != arrow.STRING {
+		return nil, fmt.Errorf("trim operation requires string type, got %s", arr.DataType())
+	}
+
+	strArray := arr.(*array.String)
+	pool := memory.NewGoAllocator()
+	builder := array.NewStringBuilder(pool)
+	defer builder.Release()
+
+	for i := 0; i < arr.Len(); i++ {
+		if strArray.IsNull(i) {
+			builder.AppendNull()
+		} else {
+			builder.Append(strings.TrimSpace(strArray.Value(i)))
+		}
+	}
+
+	return builder.NewArray(), nil
+}
+
+// evaluateTrimLeft removes leading whitespace
+func (u *UnaryExpr) evaluateTrimLeft(arr arrow.Array) (arrow.Array, error) {
+	if arr.DataType().ID() != arrow.STRING {
+		return nil, fmt.Errorf("trim_left operation requires string type, got %s", arr.DataType())
+	}
+
+	strArray := arr.(*array.String)
+	pool := memory.NewGoAllocator()
+	builder := array.NewStringBuilder(pool)
+	defer builder.Release()
+
+	for i := 0; i < arr.Len(); i++ {
+		if strArray.IsNull(i) {
+			builder.AppendNull()
+		} else {
+			builder.Append(strings.TrimLeft(strArray.Value(i), " \t\n\r"))
+		}
+	}
+
+	return builder.NewArray(), nil
+}
+
+// evaluateTrimRight removes trailing whitespace
+func (u *UnaryExpr) evaluateTrimRight(arr arrow.Array) (arrow.Array, error) {
+	if arr.DataType().ID() != arrow.STRING {
+		return nil, fmt.Errorf("trim_right operation requires string type, got %s", arr.DataType())
+	}
+
+	strArray := arr.(*array.String)
+	pool := memory.NewGoAllocator()
+	builder := array.NewStringBuilder(pool)
+	defer builder.Release()
+
+	for i := 0; i < arr.Len(); i++ {
+		if strArray.IsNull(i) {
+			builder.AppendNull()
+		} else {
+			builder.Append(strings.TrimRight(strArray.Value(i), " \t\n\r"))
+		}
+	}
+
+	return builder.NewArray(), nil
+}
+
+// evaluateLength returns the length of strings
+func (u *UnaryExpr) evaluateLength(arr arrow.Array) (arrow.Array, error) {
+	if arr.DataType().ID() != arrow.STRING {
+		return nil, fmt.Errorf("length operation requires string type, got %s", arr.DataType())
+	}
+
+	strArray := arr.(*array.String)
+	pool := memory.NewGoAllocator()
+	builder := array.NewInt64Builder(pool)
+	defer builder.Release()
+
+	for i := 0; i < arr.Len(); i++ {
+		if strArray.IsNull(i) {
+			builder.AppendNull()
+		} else {
+			builder.Append(int64(len(strArray.Value(i))))
+		}
+	}
+
+	return builder.NewArray(), nil
+}
+
+// evaluateMatch tests if strings match a regular expression pattern
+func (b *BinaryExpr) evaluateMatch(left, right arrow.Array) (arrow.Array, error) {
+	if left.Len() != right.Len() {
+		return nil, fmt.Errorf("array length mismatch: %d vs %d", left.Len(), right.Len())
+	}
+
+	// Both operands must be strings
+	if left.DataType().ID() != arrow.STRING || right.DataType().ID() != arrow.STRING {
+		return nil, fmt.Errorf("match operation requires string operands, got %s and %s", left.DataType(), right.DataType())
+	}
+
+	leftStr, ok := asStringArray(left)
+	if !ok {
+		return nil, fmt.Errorf("failed to cast left array to String")
+	}
+
+	rightStr, ok := asStringArray(right)
+	if !ok {
+		return nil, fmt.Errorf("failed to cast right array to String")
+	}
+
+	pool := memory.NewGoAllocator()
+	builder := array.NewBooleanBuilder(pool)
+	defer builder.Release()
+
+	// Cache compiled regexes for efficiency
+	regexCache := make(map[string]*regexp.Regexp)
+
+	for i := 0; i < left.Len(); i++ {
+		if leftStr.IsNull(i) || rightStr.IsNull(i) {
+			builder.AppendNull()
+		} else {
+			leftVal := leftStr.Value(i)
+			pattern := rightStr.Value(i)
+
+			// Check if regex is already compiled
+			re, exists := regexCache[pattern]
+			if !exists {
+				var err error
+				re, err = regexp.Compile(pattern)
+				if err != nil {
+					return nil, fmt.Errorf("invalid regex pattern '%s': %w", pattern, err)
+				}
+				regexCache[pattern] = re
+			}
+
+			builder.Append(re.MatchString(leftVal))
 		}
 	}
 
