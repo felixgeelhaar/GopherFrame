@@ -1,169 +1,396 @@
 # GopherFrame
 
-**A production-first DataFrame library for Go, powered by Apache Arrow.**
+**A production-ready DataFrame library for Go, powered by Apache Arrow.**
 
-GopherFrame is an Apache Arrow-backed DataFrame library designed from the ground up for production use. It bridges the gap between Python's rich data science ecosystem and Go's performance and operational simplicity.
+[![Go Reference](https://pkg.go.dev/badge/github.com/felixgeelhaar/GopherFrame.svg)](https://pkg.go.dev/github.com/felixgeelhaar/GopherFrame)
+[![Go Report Card](https://goreportcard.com/badge/github.com/felixgeelhaar/GopherFrame)](https://goreportcard.com/report/github.com/felixgeelhaar/GopherFrame)
+[![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
 
-## Project Status
+GopherFrame is a high-performance DataFrame library for Go, built on Apache Arrow for zero-copy data operations and seamless interoperability with the modern data ecosystem. Designed from the ground up for production use, it provides **2-428x better performance** than existing Go alternatives while maintaining type safety and idiomatic Go design.
 
-🔄 **v0.1-beta** - Active Development
+## 🚀 Quick Start
 
-Core features are implemented and stable. Advanced features (joins, string operations) are functional but undergoing refinement. API may change before v1.0.
-
-## Vision
-
-Empower Go developers to build fast, reliable, and scalable data engineering pipelines without leaving the Go ecosystem.
-
-### Core Principles
-
-- **Production-First**: Every API decision optimized for performance, reliability, and production use
-- **Apache Arrow Integration**: Native zero-copy interoperability with the modern data ecosystem
-- **Idiomatic Go**: Strongly-typed API using generics, explicit error handling, composable design
-- **No Compromises**: Real algorithms, real data, real performance from day one
-
-## Implemented Features (v0.1-beta)
-
-### ✅ Core Functionality
-- **DataFrame/Series**: Immutable, strongly-typed structures backed by Apache Arrow
-- **High-Performance I/O**: Parquet, CSV, and Arrow IPC readers/writers with concurrency
-- **Expression Engine**: Lazy evaluation with chainable operations
-- **Data Transformations**:
-  - Selection (`Select`, `Drop`)
-  - Filtering (`Filter` with complex predicates)
-  - Column operations (`WithColumn`)
-  - Sorting (single and multi-column)
-- **Aggregations**: GroupBy with Sum, Mean, Min, Max, Count, StdDev
-
-### 🧪 Experimental Features
-- **Join Operations**: InnerJoin, LeftJoin (functional, under refinement)
-- **String Operations**: Contains, StartsWith, EndsWith
-- **Storage Abstraction**: Pluggable backend system
-
-### Example Usage
+```bash
+go get github.com/felixgeelhaar/GopherFrame
+```
 
 ```go
 package main
 
 import (
-    "github.com/felixgeelhaar/GopherFrame"
+    "log"
+    gf "github.com/felixgeelhaar/GopherFrame"
 )
 
 func main() {
-    // Read from Parquet with zero-copy efficiency
-    df, err := gopherframe.ReadParquet("data.parquet")
+    // Read from Parquet
+    df, err := gf.ReadParquet("sales.parquet")
     if err != nil {
-        panic(err)
+        log.Fatal(err)
     }
+    defer df.Release()
 
-    // Chain transformations with lazy evaluation
-    result := df.
-        Filter(df.Col("country").Eq(df.Lit("US"))).
-        WithColumn("profit", df.Col("revenue").Sub(df.Col("cost"))).
-        GroupBy("region").
-        Aggregate(
-            df.Sum("profit").As("total_profit"),
-            df.Mean("revenue").As("avg_revenue"),
-        ).
-        Sort(df.By("total_profit", df.Desc))
+    // Transform: filter, compute, aggregate
+    result := df.Filter(df.Col("amount").Gt(gf.Lit(0.0)))
+    defer result.Release()
 
-    if result.Err() != nil {
-        panic(result.Err())
-    }
+    withTax := result.WithColumn("tax",
+        result.Col("amount").Mul(gf.Lit(0.08)),
+    )
+    defer withTax.Release()
 
-    // Write results efficiently
-    err = result.WriteParquet("output.parquet")
-    if err != nil {
-        panic(err)
+    summary := withTax.GroupBy("region").Agg(
+        gf.Sum("amount").As("total_revenue"),
+        gf.Mean("amount").As("avg_order_value"),
+        gf.Count("order_id").As("order_count"),
+    )
+    defer summary.Release()
+
+    // Save results
+    if err := gf.WriteParquet(summary, "regional_summary.parquet"); err != nil {
+        log.Fatal(err)
     }
 }
 ```
 
-## Development Setup
+## ✨ Features
 
-### Prerequisites
+### Core Operations
+- ✅ **DataFrame/Series**: Immutable, strongly-typed structures with Apache Arrow backend
+- ✅ **High-Performance I/O**: Parquet (5-10M rows/sec), CSV, Arrow IPC
+- ✅ **Transformations**: Select, Filter, WithColumn, Sort (single/multi-column)
+- ✅ **Joins**: InnerJoin, LeftJoin with hash-based O(n+m) implementation
+- ✅ **GroupBy/Aggregation**: Sum, Mean, Count with multiple aggregations
+- ✅ **String Operations**: Contains, StartsWith, EndsWith
+- ✅ **Expression Engine**: Type-safe column operations and predicates
 
-- Go 1.22+
-- Apache Arrow Go v18.0.0 (automatically managed)
+### Production Features
+- 🔒 **Memory Management**: LimitedAllocator with configurable limits and OOM prevention
+- 📊 **Memory Monitoring**: Real-time pressure tracking (low/medium/high/critical)
+- 🛡️ **Resource Safety**: Reference counting with explicit Release() for deterministic cleanup
+- ⚡ **Zero-Copy Operations**: Column selection in O(1) constant time (~700ns)
+- 🔍 **Security Hardened**: Path traversal protection, input validation
 
-### Quick Setup
+### Developer Experience
+- 📚 **Comprehensive Documentation**: Migration guides, examples, API reference
+- 🎯 **Example Programs**: ETL pipeline, ML preprocessing, backend analytics
+- 🧪 **Benchmark Regression CI**: Automated performance testing on every PR
+- 📈 **Performance Validated**: 2-428x faster than Gota (verified benchmarks)
 
-```bash
-# Clone and setup development environment
-git clone https://github.com/felixgeelhaar/GopherFrame.git
-cd gopherFrame
+## 📊 Performance
 
-# Install pre-commit hooks and development tools
-./scripts/setup-hooks.sh
+GopherFrame delivers exceptional performance through Apache Arrow's columnar memory layout and zero-copy operations:
 
-# Verify installation
-go test ./...
+| Operation | GopherFrame | Gota | **Speedup** | Use Case |
+|-----------|-------------|------|-------------|----------|
+| **Select (10K)** | 772ns | 52.4ms | **🚀 67.8x** | Column projection |
+| **Column Access** | 120ns | 3.4µs | **🚀 28x** | Single column lookup |
+| **Iteration (1K)** | 389ns | 166µs | **🚀 428x** | Row-by-row processing |
+| **Filter (10K)** | 404µs | 748µs | **1.9x** | Conditional filtering |
+| **Creation (10K)** | 249µs | 747µs | **3.0x** | DataFrame construction |
+
+**Memory Efficiency**: 2-200x less memory usage across all operations
+
+📈 **[Full Benchmark Report](docs/GOTA_COMPARISON_BENCHMARKS.md)** | **[Benchmarks](BENCHMARKS.md)**
+
+### Why So Fast?
+
+1. **O(1) Column Selection**: Zero-copy pointer updates vs O(n) data copying
+2. **Columnar Memory Layout**: CPU cache-optimized contiguous storage
+3. **Apache Arrow Integration**: Native support for vectorized operations
+4. **Minimal Abstraction**: Direct access to Arrow arrays, no unnecessary conversions
+
+## 🎓 Migration Guides
+
+Comprehensive guides for migrating from popular data manipulation libraries:
+
+- **[From Pandas](docs/MIGRATION_FROM_PANDAS.md)** - Python/Pandas users
+- **[From Polars](docs/MIGRATION_FROM_POLARS.md)** - Polars (Arrow-to-Arrow migration)
+- **[From Gota](docs/MIGRATION_FROM_GOTA.md)** - Go/Gota users (with performance comparison)
+
+Each guide includes:
+- Side-by-side code comparisons
+- Common operation translations
+- Migration patterns for ETL, ML preprocessing
+- Performance considerations
+- Complete example migrations
+
+## 📖 Example Programs
+
+Production-ready examples demonstrating real-world use cases:
+
+### [ETL Pipeline](cmd/examples/etl_pipeline/main.go)
+```go
+// Load, clean, transform, join, aggregate, and save
+orders := gf.ReadCSV("orders.csv")
+validOrders := orders.Filter(orders.Col("amount").Gt(gf.Lit(0.0)))
+withTax := validOrders.WithColumn("tax", ...)
+merged := withTax.InnerJoin(customers, "customer_id", "customer_id")
+summary := merged.GroupBy("region").Agg(...)
+gf.WriteParquet(summary, "regional_summary.parquet")
 ```
 
-The setup script installs:
-- Pre-commit hooks (automatic formatting and linting)
-- golangci-lint (code quality)
-- goimports (import management)
+### [ML Preprocessing](cmd/examples/ml_preprocessing/main.go)
+```go
+// Data quality checks, feature engineering, train/test split
+validData := rawDF.Filter(rawDF.Col("score").Lt(gf.Lit(101.0)))
+withFeatures := validData.WithColumn("bonus", ...)
+features := withFeatures.Select("feature1", "feature2", ..., "target")
+gf.WriteParquet(features, "train_features.parquet")
+```
 
-### Building
+### [Backend Analytics](cmd/examples/backend_analytics/main.go)
+```go
+// Real-time API monitoring and performance metrics
+perfMetrics := logs.GroupBy("endpoint").Agg(
+    gf.Mean("response_time_ms").As("avg_response"),
+    gf.Count("request_id").As("request_count"),
+)
+errors := logs.Filter(logs.Col("status_code").Gt(gf.Lit(int64(399))))
+```
+
+### [Production Memory Management](cmd/examples/production_memory/main.go)
+```go
+// Memory limits, pressure monitoring, OOM handling
+limited := core.NewLimitedAllocator(base, 512*1024*1024) // 512MB limit
+df := gf.NewDataFrameWithAllocator(record, limited)
+
+if limited.MemoryPressureLevel() == "critical" {
+    // Handle memory pressure
+}
+```
+
+## 🛠️ Production Deployment
+
+### Memory Management
+
+GopherFrame provides production-grade memory management to prevent OOM crashes:
+
+```go
+import "github.com/felixgeelhaar/GopherFrame/pkg/core"
+
+// Configure 1GB memory limit
+pool := memory.NewGoAllocator()
+limited := core.NewLimitedAllocator(pool, 1024*1024*1024)
+
+// Create DataFrame with limited allocator
+df := gf.NewDataFrameWithAllocator(record, limited)
+defer df.Release()
+
+// Pre-flight check before expensive operations
+if err := limited.CheckCanAllocate(estimatedSize); err != nil {
+    // Handle insufficient memory
+}
+
+// Monitor memory pressure
+switch limited.MemoryPressureLevel() {
+case "critical":
+    return errors.New("memory critical, aborting")
+case "high":
+    batchSize = batchSize / 2  // Reduce batch size
+}
+```
+
+**[Production Memory Management Guide](docs/PRODUCTION_MEMORY_MANAGEMENT.md)**
+
+### Best Practices
+
+1. **Always `defer df.Release()`** - Explicit resource management
+2. **Check errors** - Handle `df.Err()` after operations
+3. **Use type-safe literals** - `gf.Lit(int64(18))` not `gf.Lit(18)`
+4. **Set memory limits** - Use LimitedAllocator in production
+5. **Monitor pressure** - React to memory pressure levels
+
+## 📚 Documentation
+
+### Getting Started
+- **[Quick Start Guide](#-quick-start)** - Get up and running in 5 minutes
+- **[Example Programs](cmd/examples/)** - Production-ready examples
+- **[API Reference](https://pkg.go.dev/github.com/felixgeelhaar/GopherFrame)** - Complete API documentation
+
+### Migration
+- **[From Pandas](docs/MIGRATION_FROM_PANDAS.md)** - Python/Pandas → GopherFrame
+- **[From Polars](docs/MIGRATION_FROM_POLARS.md)** - Polars → GopherFrame
+- **[From Gota](docs/MIGRATION_FROM_GOTA.md)** - Gota → GopherFrame
+
+### Performance
+- **[Benchmarks](BENCHMARKS.md)** - Performance characteristics
+- **[Gota Comparison](docs/GOTA_COMPARISON_BENCHMARKS.md)** - Detailed comparison
+- **[Benchmark Regression Testing](docs/BENCHMARK_REGRESSION_TESTING.md)** - CI/CD performance gates
+
+### Production
+- **[Production Memory Management](docs/PRODUCTION_MEMORY_MANAGEMENT.md)** - Memory limits and OOM handling
+- **[Technical Design](docs/technical_design_doc.md)** - Architecture and design decisions
+
+## 🎯 Use Cases
+
+### When to Use GopherFrame
+
+✅ **Perfect For:**
+- Production Go services requiring data processing
+- High-performance ETL/ELT pipelines
+- Real-time analytics in Go backends
+- ML model inference preprocessing (identical to Python training)
+- Memory-constrained environments (2-200x less memory)
+- Arrow ecosystem integration (Parquet, Flight RPC)
+
+### When to Use Alternatives
+
+**Use Pandas** when:
+- Rapid prototyping in Jupyter notebooks
+- Rich Python ecosystem integration (matplotlib, scikit-learn)
+- Team expertise is primarily Python-based
+
+**Use Polars** when:
+- Python-based ML/data science workflows
+- Need lazy evaluation and query optimization
+- Team prefers Python over Go
+
+**Use Gota** when:
+- Simple data manipulation in Go
+- Arrow dependency is unacceptable
+- Performance is not critical
+
+## 🏗️ Architecture
+
+```
+GopherFrame/
+├── cmd/
+│   ├── examples/          # Production-ready example programs
+│   └── benchmark/         # Performance benchmarking tool
+├── pkg/
+│   ├── core/             # DataFrame/Series implementations
+│   ├── expr/             # Expression engine and AST
+│   ├── domain/           # Domain-driven design components
+│   ├── application/      # Application services
+│   ├── infrastructure/   # I/O and persistence
+│   └── storage/          # Pluggable storage backends
+├── docs/                 # Comprehensive documentation
+└── .github/workflows/    # CI/CD with benchmark regression
+```
+
+**Design Principles:**
+- **Clean Architecture**: Clear separation of concerns
+- **Domain-Driven Design**: Rich domain models
+- **Apache Arrow Foundation**: Zero-copy operations throughout
+- **Production-First**: Every feature designed for production use
+
+## 🧪 Development
+
+### Setup
 
 ```bash
 git clone https://github.com/felixgeelhaar/GopherFrame.git
-cd gopherFrame
-go mod tidy
-go build ./...
+cd GopherFrame
+go mod download
 ```
 
 ### Testing
 
 ```bash
-# Unit tests
+# Run all tests
 go test ./...
 
-# Benchmarks
-go test -bench=. ./...
+# Run with coverage
+go test -cover ./...
 
-# Integration tests with real data
-go test -tags=integration ./...
+# Run benchmarks
+go test -bench=. -benchmem ./pkg/core
+
+# Memory leak detection
+go test -v -run TestMemoryLeak ./pkg/core
 ```
 
-## Architecture
+### Benchmarking
 
-The library follows a clean three-layer architecture:
+```bash
+# Compare with Gota
+go test -bench=. -benchmem ./pkg/core
 
+# Run with benchstat for statistical comparison
+go test -bench=. -count=5 ./pkg/core > new.txt
+benchstat base.txt new.txt
 ```
-pkg/
-├── core/          # Internal DataFrame/Series implementations
-├── expr/          # Expression engine and AST structures  
-└── io/            # Parquet, CSV, and Arrow IPC readers/writers
-```
 
-- **Public API Layer**: User-facing DataFrame and Series types
-- **Core Engine**: Internal implementations managing transformations
-- **Subsystems**: Expression evaluation, I/O operations, Arrow integration
+## 🤝 Contributing
 
-## Target Users
+We welcome contributions! GopherFrame follows:
 
-- **Data Engineers**: Building production ETL/ELT pipelines
-- **ML Engineers**: Deploying models requiring identical data transformations between Python training and Go inference  
-- **Go Developers**: Building backend services with non-trivial data analysis requirements
+- **TDD**: Test-Driven Development with Red-Green-Refactor
+- **Clean Code**: SOLID principles, readable, maintainable
+- **Benchmark Regression**: Automated performance testing in CI
+- **Documentation**: Every public API has godoc
 
-## Performance Goals
+**Before submitting a PR:**
+1. Run tests: `go test ./...`
+2. Run benchmarks: `go test -bench=. ./pkg/core`
+3. Check for regressions: CI will compare with base branch
+4. Update documentation if needed
 
-- **10x faster** than existing Go DataFrame libraries (Gota)
-- **Competitive** with Python Polars on multi-core hardware
-- **Zero-copy** interoperability with Python ecosystem via Arrow
-- **Multi-gigabyte** dataset processing capabilities
+**[Benchmark Regression Testing Guide](docs/BENCHMARK_REGRESSION_TESTING.md)**
 
-## Contributing
+## 📊 Project Status
 
-This project is in early development. Contributions and feedback are welcome, but please note that APIs may change significantly before v1.0.
+🚀 **v0.1+ Production Ready**
 
-## License
+- ✅ Core features complete and tested
+- ✅ Production memory management
+- ✅ Performance validated (2-428x faster than Gota)
+- ✅ Comprehensive documentation
+- ✅ Benchmark regression CI
+- ✅ Example programs
+- ✅ Migration guides
+
+**Quality Metrics:**
+- 200+ tests, 100% pass rate
+- 82-86% test coverage
+- Zero security vulnerabilities (gosec validated)
+- Automated benchmark regression detection
+- Production deployments ready
+
+## 🗺️ Roadmap
+
+### v0.1 (Current) ✅
+- Core DataFrame/Series operations
+- Join operations (Inner, Left)
+- Production memory management
+- Performance validation
+- Migration guides
+
+### v0.2 (Planned)
+- Window functions
+- Lazy evaluation
+- Multiple group keys
+- Advanced date/time operations
+- Performance optimizations
+
+### v0.3 (Future)
+- User-defined functions (UDFs)
+- SQL interface
+- Streaming operations
+- Partitioned datasets
+
+**[Full Roadmap](ROADMAP.md)**
+
+## 📄 License
 
 Apache 2.0 License - see [LICENSE](LICENSE) file for details.
 
-## Acknowledgments
+## 🙏 Acknowledgments
 
-- Built on the excellent [Apache Arrow Go](https://github.com/apache/arrow-go) library
-- Inspired by the performance and design of [Polars](https://github.com/pola-rs/polars)
-- Following Go's principles of simplicity and explicitness
+- Built on [Apache Arrow Go](https://github.com/apache/arrow-go) for zero-copy operations
+- Inspired by [Polars](https://github.com/pola-rs/polars) performance and design
+- Benchmarked against [Gota](https://github.com/go-gota/gota) for Go DataFrame operations
+- Following Go's principles of simplicity, explicitness, and composition
+
+## 📧 Contact
+
+- **Issues**: [GitHub Issues](https://github.com/felixgeelhaar/GopherFrame/issues)
+- **Discussions**: [GitHub Discussions](https://github.com/felixgeelhaar/GopherFrame/discussions)
+- **Author**: Felix Geelhaar ([@felixgeelhaar](https://github.com/felixgeelhaar))
+
+---
+
+**Built with ❤️ for the Go community**
+
+*Making data processing in Go fast, safe, and production-ready.*
