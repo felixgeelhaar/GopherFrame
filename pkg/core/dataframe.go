@@ -34,7 +34,26 @@ type DataFrame struct {
 }
 
 // NewDataFrame creates a new DataFrame from an Arrow Record.
-// The DataFrame takes ownership of the record and will release it when closed.
+//
+// The DataFrame takes ownership of the record by incrementing its reference count.
+// The record will be released when the DataFrame's Release() method is called.
+//
+// Parameters:
+//   - record: An Arrow Record containing the tabular data
+//
+// Returns:
+//   - *DataFrame: A new DataFrame wrapping the provided record
+//
+// Memory Management:
+//   - The record's reference count is incremented (Retain called)
+//   - Caller must call Release() on the DataFrame when done
+//   - Uses memory.DefaultAllocator for internal operations
+//
+// Example:
+//
+//	record := array.NewRecord(schema, columns, numRows)
+//	df := NewDataFrame(record)
+//	defer df.Release()
 func NewDataFrame(record arrow.Record) *DataFrame {
 	record.Retain() // Increment reference count
 	return &DataFrame{
@@ -43,7 +62,29 @@ func NewDataFrame(record arrow.Record) *DataFrame {
 	}
 }
 
-// NewDataFrameWithAllocator creates a new DataFrame with a custom allocator.
+// NewDataFrameWithAllocator creates a new DataFrame with a custom memory allocator.
+//
+// Use this constructor when you need fine-grained control over memory allocation,
+// such as tracking memory usage or using a custom memory pool.
+//
+// Parameters:
+//   - record: An Arrow Record containing the tabular data
+//   - allocator: Custom memory.Allocator for internal operations
+//
+// Returns:
+//   - *DataFrame: A new DataFrame using the specified allocator
+//
+// Memory Management:
+//   - The record's reference count is incremented (Retain called)
+//   - The provided allocator is used for all future operations
+//   - Caller must call Release() on the DataFrame when done
+//
+// Example:
+//
+//	pool := memory.NewGoAllocator()
+//	record := array.NewRecord(schema, columns, numRows)
+//	df := NewDataFrameWithAllocator(record, pool)
+//	defer df.Release()
 func NewDataFrameWithAllocator(record arrow.Record, allocator memory.Allocator) *DataFrame {
 	record.Retain()
 	return &DataFrame{
@@ -53,6 +94,36 @@ func NewDataFrameWithAllocator(record arrow.Record, allocator memory.Allocator) 
 }
 
 // NewDataFrameFromStorage creates a DataFrame by reading from a storage backend.
+//
+// This function reads data from various storage formats (Parquet, CSV, Arrow IPC)
+// through the provided storage backend. It currently reads the first record from
+// the source; future versions will support multiple records.
+//
+// Parameters:
+//   - ctx: Context for cancellation and timeout control
+//   - backend: Storage backend implementation (e.g., ArrowBackend, ParquetBackend)
+//   - source: Path or identifier for the data source
+//   - opts: Read options (format-specific settings)
+//
+// Returns:
+//   - *DataFrame: New DataFrame containing the data from storage
+//   - error: Returns error if backend is nil, source is empty, or read fails
+//
+// Errors:
+//   - Returns error if backend is nil
+//   - Returns error if source is empty string
+//   - Returns error if no records found in source
+//   - Returns error if read operation fails
+//
+// Example:
+//
+//	ctx := context.Background()
+//	backend := arrowbackend.NewBackend()
+//	df, err := NewDataFrameFromStorage(ctx, backend, "data.parquet", storage.ReadOptions{})
+//	if err != nil {
+//	    log.Fatal(err)
+//	}
+//	defer df.Release()
 func NewDataFrameFromStorage(ctx context.Context, backend storage.Backend, source string, opts storage.ReadOptions) (*DataFrame, error) {
 	if backend == nil {
 		return nil, fmt.Errorf("backend cannot be nil")
@@ -88,28 +159,69 @@ func NewDataFrameFromStorage(ctx context.Context, backend storage.Backend, sourc
 	return df, nil
 }
 
-// Schema returns the Arrow schema of the DataFrame.
+// Schema returns the Arrow schema defining the DataFrame's structure.
+//
+// The schema contains field metadata including column names, types, and nullability.
+// This method is O(1) and returns a pointer to the internal schema.
+//
+// Returns:
+//   - *arrow.Schema: The Arrow schema defining column structure
+//
+// Example:
+//
+//	schema := df.Schema()
+//	for i, field := range schema.Fields() {
+//	    fmt.Printf("Column %d: %s (%s)\n", i, field.Name, field.Type)
+//	}
 func (df *DataFrame) Schema() *arrow.Schema {
 	return df.record.Schema()
 }
 
 // NumRows returns the number of rows in the DataFrame.
+//
+// This is an O(1) operation that returns the row count from the underlying Arrow record.
+//
+// Returns:
+//   - int64: Number of rows in the DataFrame
 func (df *DataFrame) NumRows() int64 {
 	return df.record.NumRows()
 }
 
 // NumCols returns the number of columns in the DataFrame.
+//
+// This is an O(1) operation that returns the column count from the underlying Arrow record.
+//
+// Returns:
+//   - int64: Number of columns in the DataFrame
 func (df *DataFrame) NumCols() int64 {
 	return df.record.NumCols()
 }
 
 // Record returns the underlying Arrow Record.
-// This is used internally by operations that need direct Arrow access.
+//
+// This method provides direct access to the internal Arrow record for advanced use cases
+// or interoperability with Arrow libraries. Use with caution as it exposes internal state.
+//
+// Returns:
+//   - arrow.Record: The underlying Arrow record
+//
+// Note: This is used internally by operations that need direct Arrow access.
 func (df *DataFrame) Record() arrow.Record {
 	return df.record
 }
 
 // ColumnNames returns the names of all columns in order.
+//
+// The returned slice contains column names in the same order as they appear in the schema.
+// This is useful for iterating over columns or discovering column names dynamically.
+//
+// Returns:
+//   - []string: Slice of column names in schema order
+//
+// Example:
+//
+//	names := df.ColumnNames()
+//	fmt.Printf("Columns: %v\n", names)
 func (df *DataFrame) ColumnNames() []string {
 	schema := df.record.Schema()
 	names := make([]string, schema.NumFields())
@@ -120,6 +232,28 @@ func (df *DataFrame) ColumnNames() []string {
 }
 
 // Column returns a Series for the specified column name.
+//
+// This method performs a linear search through the schema to find the column.
+// The returned Series shares the underlying Arrow data with the DataFrame (zero-copy).
+//
+// Parameters:
+//   - name: The name of the column to retrieve
+//
+// Returns:
+//   - *Series: A Series containing the column data
+//   - error: Returns error if column not found, with available column names
+//
+// Complexity: O(n) where n is the number of columns
+//
+// Example:
+//
+//	series, err := df.Column("age")
+//	if err != nil {
+//	    log.Fatal(err)
+//	}
+//	defer series.Release()
+//
+// See also: ColumnAt for index-based access, HasColumn to check existence
 func (df *DataFrame) Column(name string) (*Series, error) {
 	schema := df.record.Schema()
 	fieldIndex := -1
@@ -143,6 +277,27 @@ func (df *DataFrame) Column(name string) (*Series, error) {
 }
 
 // ColumnAt returns a Series for the column at the specified index.
+//
+// This method provides O(1) access to columns by index, more efficient than Column()
+// which performs a linear search by name. The returned Series shares the underlying
+// Arrow data with the DataFrame (zero-copy).
+//
+// Parameters:
+//   - index: Zero-based column index (0 to NumCols()-1)
+//
+// Returns:
+//   - *Series: A Series containing the column data
+//   - error: Returns error if index is out of bounds
+//
+// Example:
+//
+//	series, err := df.ColumnAt(0)  // First column
+//	if err != nil {
+//	    log.Fatal(err)
+//	}
+//	defer series.Release()
+//
+// See also: Column for name-based access
 func (df *DataFrame) ColumnAt(index int) (*Series, error) {
 	if index < 0 || index >= int(df.NumCols()) {
 		return nil, fmt.Errorf("column index out of range: %d", index)
@@ -155,6 +310,21 @@ func (df *DataFrame) ColumnAt(index int) (*Series, error) {
 }
 
 // Columns returns all columns as a slice of Series.
+//
+// This method creates a new Series for each column in the DataFrame. Each Series
+// shares the underlying Arrow data (zero-copy), but the slice itself is newly allocated.
+//
+// Returns:
+//   - []*Series: Slice of Series, one for each column in order
+//
+// Memory: Caller is responsible for calling Release() on each returned Series
+//
+// Example:
+//
+//	for i, series := range df.Columns() {
+//	    fmt.Printf("Column %d: %s\n", i, series.Name())
+//	    defer series.Release()
+//	}
 func (df *DataFrame) Columns() []*Series {
 	numCols := int(df.NumCols())
 	series := make([]*Series, numCols)
@@ -169,6 +339,24 @@ func (df *DataFrame) Columns() []*Series {
 }
 
 // HasColumn checks if a column with the given name exists.
+//
+// This method performs a linear search through the schema. Use this to check
+// column existence before calling Column() to avoid errors.
+//
+// Parameters:
+//   - name: Column name to check
+//
+// Returns:
+//   - bool: True if column exists, false otherwise
+//
+// Complexity: O(n) where n is the number of columns
+//
+// Example:
+//
+//	if df.HasColumn("age") {
+//	    series, _ := df.Column("age")
+//	    defer series.Release()
+//	}
 func (df *DataFrame) HasColumn(name string) bool {
 	schema := df.record.Schema()
 	for _, field := range schema.Fields() {
