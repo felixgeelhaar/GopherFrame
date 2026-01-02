@@ -164,15 +164,29 @@ jobs:
       with:
         go-version: '1.23'
 
-    - name: Run Gosec Security Scanner
+    - name: Install security tools
       run: |
+        go install github.com/felixgeelhaar/verdictsec/cmd/verdict@latest
         go install github.com/securego/gosec/v2/cmd/gosec@latest
-        # Exclude G304 (file inclusion) - legitimate for data processing library with path validation
-        # Exclude G104 (unhandled errors) - minor issues in example cleanup code
+        go install golang.org/x/vuln/cmd/govulncheck@latest
+        go install github.com/gitleaks/gitleaks/v8@latest
+
+    - name: Run VerdictSec Security Scan
+      run: |
+        # Run comprehensive security scan (SAST, vulnerabilities, secrets)
+        verdict scan --json -o verdict-results.json || true
+        # Also run gosec for SARIF output (GitHub Security tab)
         gosec -exclude=G304,G104 -fmt sarif -out gosec.sarif ./... || true
 
     - name: Upload SARIF file
       uses: github/codeql-action/upload-sarif@v3
       with:
         sarif_file: gosec.sarif
+      if: always()
+
+    - name: Upload VerdictSec results
+      uses: actions/upload-artifact@v4
+      with:
+        name: security-scan-results
+        path: verdict-results.json
       if: always()
