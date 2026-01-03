@@ -18,24 +18,24 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        go-version: ['1.21', '1.22', '1.23', '1.24']
-    
+        go-version: ['1.22', '1.23', '1.24', '1.25']
+
     steps:
     - name: Checkout code
-      uses: actions/checkout@v4
+      uses: actions/checkout@v6
 
     - name: Set up Go
-      uses: actions/setup-go@v5
+      uses: actions/setup-go@v6
       with:
         go-version: ${{ matrix.go-version }}
 
     - name: Cache Go modules
-      uses: actions/cache@v3
+      uses: actions/cache@v5
       with:
         path: ~/go/pkg/mod
-        key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+        key: ${{ runner.os }}-go-${{ matrix.go-version }}-${{ hashFiles('**/go.sum') }}
         restore-keys: |
-          ${{ runner.os }}-go-
+          ${{ runner.os }}-go-${{ matrix.go-version }}-
 
     - name: Download dependencies
       run: go mod download
@@ -67,68 +67,49 @@ jobs:
           exit 1
         fi
 
-    - name: Check test coverage threshold
+    - name: Install coverctl
+      run: go install github.com/felixgeelhaar/coverctl@latest
+
+    - name: Check coverage with coverctl
       run: |
-        # Calculate coverage percentage for pkg/ (examples excluded)
-        COVERAGE=$(go tool cover -func=coverage.out | grep total | awk '{print $3}' | sed 's/%//')
-        echo "📊 Current test coverage (pkg/): ${COVERAGE}%"
-
-        # Set minimum coverage threshold (80% for production code)
-        THRESHOLD=80
-
-        # Compare coverage to threshold
-        if (( $(echo "$COVERAGE < $THRESHOLD" | bc -l) )); then
-          echo "❌ Coverage ${COVERAGE}% is below threshold ${THRESHOLD}%"
-          exit 1
-        else
-          echo "✅ Coverage ${COVERAGE}% meets threshold ${THRESHOLD}%"
-        fi
-
-    - name: Upload coverage to Codecov
-      uses: codecov/codecov-action@v3
-      with:
-        file: ./coverage.out
-        flags: unittests
-        name: codecov-umbrella
-        fail_ci_if_error: false
-      continue-on-error: true
+        coverctl report --profile=coverage.out --fail-under=80
 
   lint:
     name: Lint
     runs-on: ubuntu-latest
-    needs: test  # Only run if tests pass
+    needs: test
 
     steps:
     - name: Checkout code
-      uses: actions/checkout@v4
+      uses: actions/checkout@v6
 
     - name: Set up Go
-      uses: actions/setup-go@v5
+      uses: actions/setup-go@v6
       with:
-        go-version: '1.23'
+        go-version: '1.24'
 
     - name: golangci-lint
-      uses: golangci/golangci-lint-action@v4
+      uses: golangci/golangci-lint-action@v9
       with:
-        version: latest
+        version: v2.7.2
         args: --timeout=5m --out-format=colored-line-number
 
   benchmark:
     name: Benchmark
     runs-on: ubuntu-latest
-    needs: test  # Only run if tests pass
+    needs: test
 
     steps:
     - name: Checkout code
-      uses: actions/checkout@v4
+      uses: actions/checkout@v6
 
     - name: Set up Go
-      uses: actions/setup-go@v5
+      uses: actions/setup-go@v6
       with:
-        go-version: '1.23'
+        go-version: '1.24'
 
     - name: Cache Go modules
-      uses: actions/cache@v3
+      uses: actions/cache@v5
       with:
         path: ~/go/pkg/mod
         key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
@@ -153,38 +134,33 @@ jobs:
   security:
     name: Security Scan
     runs-on: ubuntu-latest
-    needs: test  # Only run if tests pass
+    needs: test
 
     steps:
     - name: Checkout code
-      uses: actions/checkout@v4
+      uses: actions/checkout@v6
 
     - name: Set up Go
-      uses: actions/setup-go@v5
+      uses: actions/setup-go@v6
       with:
-        go-version: '1.23'
+        go-version: '1.24'
 
-    - name: Install security tools
-      run: |
-        go install github.com/felixgeelhaar/verdictsec/cmd/verdict@latest
-        go install github.com/securego/gosec/v2/cmd/gosec@latest
-        go install golang.org/x/vuln/cmd/govulncheck@latest
+    - name: Install VerdictSec
+      run: go install github.com/felixgeelhaar/verdictsec/cmd/verdict@latest
 
     - name: Run VerdictSec Security Scan
       run: |
-        # Run comprehensive security scan (SAST, vulnerabilities, secrets)
         verdict scan --json -o verdict-results.json || true
-        # Also run gosec for SARIF output (GitHub Security tab)
-        gosec -exclude=G304,G104 -fmt sarif -out gosec.sarif ./... || true
 
-    - name: Upload SARIF file
-      uses: github/codeql-action/upload-sarif@v3
+    - name: Upload VerdictSec SARIF
+      uses: github/codeql-action/upload-sarif@v4
       with:
-        sarif_file: gosec.sarif
-      if: always()
+        sarif_file: verdict-results.sarif
+      if: always() && hashFiles('verdict-results.sarif') != ''
+      continue-on-error: true
 
     - name: Upload VerdictSec results
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v6
       with:
         name: security-scan-results
         path: verdict-results.json
