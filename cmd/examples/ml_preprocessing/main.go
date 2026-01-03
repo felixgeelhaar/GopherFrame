@@ -161,8 +161,8 @@ func main() {
 		validatedDF.NumRows(), validatedDF.NumCols())
 
 	// Clean up temp files
-	os.Remove(fullDataPath)
-	os.Remove(trainFeaturesPath)
+	_ = os.Remove(fullDataPath)
+	_ = os.Remove(trainFeaturesPath)
 
 	// Summary
 	fmt.Println("\n=== ML Preprocessing Pipeline Complete ===")

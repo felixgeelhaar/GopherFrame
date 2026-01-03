@@ -245,7 +245,7 @@ func createUserActivityData(pool memory.Allocator, numRows int) *gf.DataFrame {
 func getMemoryLimitFromEnv() int64 {
 	limitMB := 512 // Default: 512MB
 	if envLimit := os.Getenv("GOPHERFRAME_MEMORY_LIMIT_MB"); envLimit != "" {
-		fmt.Sscanf(envLimit, "%d", &limitMB)
+		_, _ = fmt.Sscanf(envLimit, "%d", &limitMB)
 	}
 	return int64(limitMB * 1024 * 1024)
 }
