@@ -53,7 +53,7 @@ func TestDataFrame_WriteToStorage(t *testing.T) {
 	// Create temporary directory for test
 	tmpDir, err := os.MkdirTemp("", "gopherframe-storage-test-*")
 	require.NoError(t, err)
-	defer os.RemoveAll(tmpDir)
+	defer func() { _ = os.RemoveAll(tmpDir) }()
 
 	testFile := filepath.Join(tmpDir, "test.arrow")
 
@@ -73,7 +73,7 @@ func TestDataFrame_WriteToStorage(t *testing.T) {
 
 	// Test: Read back and verify
 	readBackend := arrowbackend.NewBackend()
-	defer readBackend.Close()
+	defer func() { _ = readBackend.Close() }()
 
 	readDf, err := NewDataFrameFromStorage(ctx, readBackend, testFile, storage.ReadOptions{})
 	require.NoError(t, err)
@@ -123,7 +123,7 @@ func TestDataFrame_WriteToStorageWithOptions(t *testing.T) {
 	// Create temp directory
 	tmpDir, err := os.MkdirTemp("", "gopherframe-options-test-*")
 	require.NoError(t, err)
-	defer os.RemoveAll(tmpDir)
+	defer func() { _ = os.RemoveAll(tmpDir) }()
 
 	testFile := filepath.Join(tmpDir, "test.arrow")
 
@@ -138,7 +138,7 @@ func TestDataFrame_WriteToStorageWithOptions(t *testing.T) {
 
 	err = df.WriteToStorage(ctx, backend, testFile, opts)
 	require.NoError(t, err)
-	backend.Close()
+	_ = backend.Close()
 
 	// Verify file exists
 	_, err = os.Stat(testFile)
@@ -155,7 +155,7 @@ func TestNewDataFrameFromStorage_Error(t *testing.T) {
 
 	// Test with non-existent file
 	backend := arrowbackend.NewBackend()
-	defer backend.Close()
+	defer func() { _ = backend.Close() }()
 	_, err = NewDataFrameFromStorage(ctx, backend, "/nonexistent/path/file.arrow", storage.ReadOptions{})
 	assert.Error(t, err)
 }
@@ -290,7 +290,7 @@ func TestDataFrame_WriteReadRoundTrip(t *testing.T) {
 	// Write and read back
 	tmpDir, err := os.MkdirTemp("", "gopherframe-roundtrip-test-*")
 	require.NoError(t, err)
-	defer os.RemoveAll(tmpDir)
+	defer func() { _ = os.RemoveAll(tmpDir) }()
 
 	testFile := filepath.Join(tmpDir, "roundtrip.arrow")
 	ctx := context.Background()
@@ -298,10 +298,10 @@ func TestDataFrame_WriteReadRoundTrip(t *testing.T) {
 	writeBackend := arrowbackend.NewBackend()
 	err = originalDf.WriteToStorage(ctx, writeBackend, testFile, storage.WriteOptions{})
 	require.NoError(t, err)
-	writeBackend.Close()
+	_ = writeBackend.Close()
 
 	readBackend := arrowbackend.NewBackend()
-	defer readBackend.Close()
+	defer func() { _ = readBackend.Close() }()
 
 	readDf, err := NewDataFrameFromStorage(ctx, readBackend, testFile, storage.ReadOptions{})
 	require.NoError(t, err)

@@ -92,7 +92,7 @@ func (s *GroupByService) performSingleColumnGroupBy(df *dataframe.DataFrame, req
 	record := df.Record()
 	schema := record.Schema()
 
-	var groupColIndex int = -1
+	groupColIndex := -1
 	for i, field := range schema.Fields() {
 		if field.Name == groupCol {
 			groupColIndex = i
@@ -175,7 +175,7 @@ func (s *GroupByService) extractGroups(groupArray arrow.Array) (arrow.Array, map
 // performAggregation executes a single aggregation operation.
 func (s *GroupByService) performAggregation(record arrow.Record, agg AggregationSpec, groupIndices map[string][]int) (arrow.Field, arrow.Array, error) {
 	// Find the column to aggregate
-	var aggColIndex int = -1
+	aggColIndex := -1
 	schema := record.Schema()
 	for i, field := range schema.Fields() {
 		if field.Name == agg.Column {
@@ -209,7 +209,7 @@ func (s *GroupByService) performAggregation(record arrow.Record, agg Aggregation
 		return s.performMode(aggArray, groupIndices, agg.Alias)
 	case Correlation:
 		// For correlation, we need to get the second column
-		var secondColIndex int = -1
+		secondColIndex := -1
 		for i, field := range record.Schema().Fields() {
 			if field.Name == agg.SecondColumn {
 				secondColIndex = i
@@ -554,7 +554,7 @@ func (s *GroupByService) buildGroupKeyColumn(groupKeys [][]string, columnIndex i
 // performMultiColumnAggregation executes aggregation for multi-column groups.
 func (s *GroupByService) performMultiColumnAggregation(record arrow.Record, agg AggregationSpec, groupKeys [][]string, groupIndices map[string][]int) (arrow.Field, arrow.Array, error) {
 	// Find the column to aggregate
-	var aggColIndex int = -1
+	aggColIndex := -1
 	schema := record.Schema()
 	for i, field := range schema.Fields() {
 		if field.Name == agg.Column {
@@ -597,7 +597,7 @@ func (s *GroupByService) performMultiColumnAggregation(record arrow.Record, agg 
 		return s.performModeMultiColumn(aggArray, groupKeys, orderedGroupMap, agg.Alias)
 	case Correlation:
 		// For correlation, we need to get the second column
-		var secondColIndex int = -1
+		secondColIndex := -1
 		for i, field := range record.Schema().Fields() {
 			if field.Name == agg.SecondColumn {
 				secondColIndex = i

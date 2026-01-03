@@ -117,9 +117,10 @@ func TestInnerJoin_BasicFunctionality(t *testing.T) {
 	userIdIdx := -1
 	nameIdx := -1
 	for i, colName := range actualCols {
-		if colName == "user_id" {
+		switch colName {
+		case "user_id":
 			userIdIdx = i
-		} else if colName == "name" {
+		case "name":
 			nameIdx = i
 		}
 	}
@@ -352,9 +353,10 @@ func TestJoin_DuplicateColumnNames(t *testing.T) {
 	nameIdx := -1
 	rightNameIdx := -1
 	for i, colName := range actualCols {
-		if colName == "name" {
+		switch colName {
+		case "name":
 			nameIdx = i
-		} else if colName == "right_name" {
+		case "right_name":
 			rightNameIdx = i
 		}
 	}

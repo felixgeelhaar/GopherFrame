@@ -71,7 +71,7 @@ func TestParquetWithRealData(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create temp dir: %v", err)
 	}
-	defer os.RemoveAll(tempDir)
+	defer func() { _ = os.RemoveAll(tempDir) }()
 
 	parquetFile := filepath.Join(tempDir, "large.parquet")
 
@@ -109,7 +109,7 @@ func TestCSVRoundTrip(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create temp dir: %v", err)
 	}
-	defer os.RemoveAll(tempDir)
+	defer func() { _ = os.RemoveAll(tempDir) }()
 
 	csvFile := filepath.Join(tempDir, "test.csv")
 
@@ -146,7 +146,7 @@ func TestStorageBackendIntegration(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create temp dir: %v", err)
 	}
-	defer os.RemoveAll(tempDir)
+	defer func() { _ = os.RemoveAll(tempDir) }()
 
 	// Test with Arrow storage backend
 	arrowFile := filepath.Join(tempDir, "test.arrow")

@@ -134,7 +134,7 @@ func (m *mockRecordReader) Close() error          { return nil }
 
 func TestMemoryBackend(t *testing.T) {
 	backend := NewMemoryBackend()
-	defer backend.Close()
+	defer func() { _ = backend.Close() }()
 
 	ctx := context.Background()
 
@@ -150,7 +150,7 @@ func TestMemoryBackend(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Read failed: %v", err)
 	}
-	reader.Close()
+	_ = reader.Close()
 
 	// Test Read non-existent
 	_, err = backend.Read(ctx, "nonexistent", ReadOptions{})
@@ -209,7 +209,7 @@ func TestRegistry(t *testing.T) {
 	if backend == nil {
 		t.Error("Expected backend, got nil")
 	}
-	defer backend.Close()
+	defer func() { _ = backend.Close() }()
 
 	// Test Create non-existent
 	_, err = registry.Create("nonexistent")
