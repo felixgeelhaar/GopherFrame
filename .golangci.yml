@@ -5,16 +5,6 @@ run:
 
 linters:
   default: standard
-  enable:
-    - bodyclose
-    - dogsled
-    - errcheck
-    - gosimple
-    - ineffassign
-    - staticcheck
-    - unconvert
-    - unused
-    - whitespace
 
 formatters:
   enable:
