@@ -242,10 +242,12 @@ func createUserActivityData(pool memory.Allocator, numRows int) *gf.DataFrame {
 }
 
 // Example of reading memory limit from environment
+//
+//nolint:unused // example function showing environment configuration pattern
 func getMemoryLimitFromEnv() int64 {
 	limitMB := 512 // Default: 512MB
 	if envLimit := os.Getenv("GOPHERFRAME_MEMORY_LIMIT_MB"); envLimit != "" {
-		fmt.Sscanf(envLimit, "%d", &limitMB)
+		_, _ = fmt.Sscanf(envLimit, "%d", &limitMB)
 	}
 	return int64(limitMB * 1024 * 1024)
 }

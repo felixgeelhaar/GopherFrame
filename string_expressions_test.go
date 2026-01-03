@@ -320,11 +320,12 @@ func TestStringOperations_Performance(t *testing.T) {
 	const size = 10000
 	texts := make([]string, size)
 	for i := 0; i < size; i++ {
-		if i%3 == 0 {
+		switch i % 3 {
+		case 0:
 			texts[i] = "prefix_match_" + fmt.Sprintf("%d", i)
-		} else if i%3 == 1 {
+		case 1:
 			texts[i] = fmt.Sprintf("%d", i) + "_suffix_match"
-		} else {
+		default:
 			texts[i] = "no_match_" + fmt.Sprintf("%d", i)
 		}
 	}

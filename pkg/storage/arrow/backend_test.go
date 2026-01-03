@@ -34,7 +34,7 @@ func TestBackend_Close(t *testing.T) {
 
 func TestBackend_ReadWrite_RoundTrip(t *testing.T) {
 	backend := NewBackend()
-	defer backend.Close()
+	defer func() { _ = backend.Close() }()
 
 	// Create test data
 	pool := memory.NewGoAllocator()
@@ -100,7 +100,7 @@ func TestBackend_ReadWrite_RoundTrip(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Read failed: %v", err)
 	}
-	defer reader.Close()
+	defer func() { _ = reader.Close() }()
 
 	// Verify schema
 	readSchema := reader.Schema()
@@ -149,7 +149,7 @@ func TestBackend_ReadWrite_RoundTrip(t *testing.T) {
 
 func TestBackend_Schema(t *testing.T) {
 	backend := NewBackend()
-	defer backend.Close()
+	defer func() { _ = backend.Close() }()
 
 	// Create test data file first
 	tempDir := t.TempDir()
@@ -172,7 +172,7 @@ func TestBackend_Schema(t *testing.T) {
 
 	writer, err := ipc.NewFileWriter(file, ipc.WithSchema(schema))
 	if err != nil {
-		file.Close()
+		_ = file.Close()
 		t.Fatalf("Failed to create writer: %v", err)
 	}
 
@@ -189,14 +189,14 @@ func TestBackend_Schema(t *testing.T) {
 	defer emptyRecord.Release()
 
 	if err := writer.Write(emptyRecord); err != nil {
-		writer.Close()
-		file.Close()
+		_ = writer.Close()
+		_ = file.Close()
 		t.Fatalf("Failed to write record: %v", err)
 	}
 
 	// Properly close writer and file
 	if closeErr := writer.Close(); closeErr != nil {
-		file.Close()
+		_ = file.Close()
 		t.Fatalf("Failed to close writer: %v", closeErr)
 	}
 
@@ -231,7 +231,7 @@ func TestBackend_Schema(t *testing.T) {
 
 func TestBackend_Read_NonExistentFile(t *testing.T) {
 	backend := NewBackend()
-	defer backend.Close()
+	defer func() { _ = backend.Close() }()
 
 	ctx := context.Background()
 	readOpts := storage.ReadOptions{}
@@ -248,7 +248,7 @@ func TestBackend_Read_NonExistentFile(t *testing.T) {
 
 func TestBackend_Read_InvalidSource(t *testing.T) {
 	backend := NewBackend()
-	defer backend.Close()
+	defer func() { _ = backend.Close() }()
 
 	ctx := context.Background()
 	readOpts := storage.ReadOptions{}
@@ -265,7 +265,7 @@ func TestBackend_Read_InvalidSource(t *testing.T) {
 
 func TestBackend_Write_InvalidDestination(t *testing.T) {
 	backend := NewBackend()
-	defer backend.Close()
+	defer func() { _ = backend.Close() }()
 
 	ctx := context.Background()
 	writeOpts := storage.WriteOptions{}
@@ -283,7 +283,7 @@ func TestBackend_Write_InvalidDestination(t *testing.T) {
 
 func TestBackend_Write_OverwriteProtection(t *testing.T) {
 	backend := NewBackend()
-	defer backend.Close()
+	defer func() { _ = backend.Close() }()
 
 	// Create existing file
 	tempDir := t.TempDir()
@@ -293,7 +293,7 @@ func TestBackend_Write_OverwriteProtection(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create test file: %v", err)
 	}
-	file.Close()
+	_ = file.Close()
 
 	ctx := context.Background()
 	writeOpts := storage.WriteOptions{
@@ -309,7 +309,7 @@ func TestBackend_Write_OverwriteProtection(t *testing.T) {
 
 func TestBackend_Scan(t *testing.T) {
 	backend := NewBackend()
-	defer backend.Close()
+	defer func() { _ = backend.Close() }()
 
 	// Create test directory with Arrow files
 	tempDir := t.TempDir()
@@ -324,7 +324,7 @@ func TestBackend_Scan(t *testing.T) {
 		if err != nil {
 			t.Fatalf("Failed to create test file %s: %v", filename, err)
 		}
-		file.Close()
+		_ = file.Close()
 	}
 
 	ctx := context.Background()
@@ -386,7 +386,7 @@ func (m *mockRecordReader) Close() error {
 
 func TestBackend_Read_CorruptedFile(t *testing.T) {
 	backend := NewBackend()
-	defer backend.Close()
+	defer func() { _ = backend.Close() }()
 
 	// Create a corrupted Arrow file (not valid Arrow format)
 	tempDir := t.TempDir()
@@ -400,10 +400,10 @@ func TestBackend_Read_CorruptedFile(t *testing.T) {
 	// Write invalid content
 	_, err = file.WriteString("This is not a valid Arrow file")
 	if err != nil {
-		file.Close()
+		_ = file.Close()
 		t.Fatalf("Failed to write invalid content: %v", err)
 	}
-	file.Close()
+	_ = file.Close()
 
 	ctx := context.Background()
 	readOpts := storage.ReadOptions{}
@@ -416,7 +416,7 @@ func TestBackend_Read_CorruptedFile(t *testing.T) {
 
 func TestBackend_Schema_NonExistentFile(t *testing.T) {
 	backend := NewBackend()
-	defer backend.Close()
+	defer func() { _ = backend.Close() }()
 
 	ctx := context.Background()
 	_, err := backend.Schema(ctx, "/nonexistent/file.arrow")
@@ -427,7 +427,7 @@ func TestBackend_Schema_NonExistentFile(t *testing.T) {
 
 func TestBackend_Schema_CorruptedFile(t *testing.T) {
 	backend := NewBackend()
-	defer backend.Close()
+	defer func() { _ = backend.Close() }()
 
 	// Create a corrupted Arrow file
 	tempDir := t.TempDir()
@@ -440,10 +440,10 @@ func TestBackend_Schema_CorruptedFile(t *testing.T) {
 
 	_, err = file.WriteString("Invalid Arrow content")
 	if err != nil {
-		file.Close()
+		_ = file.Close()
 		t.Fatalf("Failed to write invalid content: %v", err)
 	}
-	file.Close()
+	_ = file.Close()
 
 	ctx := context.Background()
 	_, err = backend.Schema(ctx, filename)
@@ -454,7 +454,7 @@ func TestBackend_Schema_CorruptedFile(t *testing.T) {
 
 func TestBackend_Write_DirectoryCreation(t *testing.T) {
 	backend := NewBackend()
-	defer backend.Close()
+	defer func() { _ = backend.Close() }()
 
 	// Create test data
 	pool := memory.NewGoAllocator()
@@ -500,7 +500,7 @@ func TestBackend_Write_DirectoryCreation(t *testing.T) {
 
 func TestBackend_Write_FileCreationError(t *testing.T) {
 	backend := NewBackend()
-	defer backend.Close()
+	defer func() { _ = backend.Close() }()
 
 	mockReader := &mockRecordReader{}
 
@@ -518,7 +518,7 @@ func TestBackend_Write_FileCreationError(t *testing.T) {
 
 func TestRecordReader_WithLimit(t *testing.T) {
 	backend := NewBackend()
-	defer backend.Close()
+	defer func() { _ = backend.Close() }()
 
 	// Create test data with multiple records
 	pool := memory.NewGoAllocator()
@@ -577,7 +577,7 @@ func TestRecordReader_WithLimit(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Read failed: %v", err)
 	}
-	defer reader.Close()
+	defer func() { _ = reader.Close() }()
 
 	// Count records read (should be limited to 2)
 	recordCount := 0
@@ -599,7 +599,7 @@ func TestRecordReader_WithLimit(t *testing.T) {
 
 func TestRecordReader_ContextCancellation(t *testing.T) {
 	backend := NewBackend()
-	defer backend.Close()
+	defer func() { _ = backend.Close() }()
 
 	// Create test data
 	pool := memory.NewGoAllocator()
@@ -645,7 +645,7 @@ func TestRecordReader_ContextCancellation(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Read failed: %v", err)
 	}
-	defer reader.Close()
+	defer func() { _ = reader.Close() }()
 
 	// Try to read - should detect context cancellation
 	hasNext := reader.Next()
@@ -660,7 +660,7 @@ func TestRecordReader_ContextCancellation(t *testing.T) {
 
 func TestRecordReader_RecordAtError(t *testing.T) {
 	backend := NewBackend()
-	defer backend.Close()
+	defer func() { _ = backend.Close() }()
 
 	// Create a simple Arrow file
 	pool := memory.NewGoAllocator()
@@ -701,7 +701,7 @@ func TestRecordReader_RecordAtError(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Read failed: %v", err)
 	}
-	defer reader.Close()
+	defer func() { _ = reader.Close() }()
 
 	// Read all available records to exhaust the reader
 	for reader.Next() {
@@ -717,7 +717,7 @@ func TestRecordReader_RecordAtError(t *testing.T) {
 
 func TestBackend_Scan_InvalidPattern(t *testing.T) {
 	backend := NewBackend()
-	defer backend.Close()
+	defer func() { _ = backend.Close() }()
 
 	ctx := context.Background()
 
@@ -730,7 +730,7 @@ func TestBackend_Scan_InvalidPattern(t *testing.T) {
 
 func TestBackend_Scan_EmptyDirectory(t *testing.T) {
 	backend := NewBackend()
-	defer backend.Close()
+	defer func() { _ = backend.Close() }()
 
 	tempDir := t.TempDir()
 	pattern := filepath.Join(tempDir, "*.arrow")

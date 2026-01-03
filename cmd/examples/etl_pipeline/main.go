@@ -144,8 +144,8 @@ func main() {
 	fmt.Printf("✓ Successfully validated %d rows in output\n", validatedDF.NumRows())
 
 	// Clean up temp files
-	os.Remove(regionalOutputPath)
-	os.Remove(detailedOutputPath)
+	_ = os.Remove(regionalOutputPath)
+	_ = os.Remove(detailedOutputPath)
 
 	fmt.Println("\n=== ETL Pipeline Complete ===")
 	fmt.Println("\nPipeline Summary:")
