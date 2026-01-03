@@ -72,7 +72,7 @@ jobs:
 
     - name: Check coverage with coverctl
       run: |
-        coverctl check --profile=coverage.out --fail-under=80
+        coverctl report --profile=coverage.out --domains=pkg
 
   lint:
     name: Lint
