@@ -1,68 +1,14 @@
+version: "2"
+
 run:
   timeout: 5m
-  modules-download-mode: readonly
-  go: '1.23'
-
-linters-settings:
-  gocyclo:
-    min-complexity: 30
-  
-  govet:
-    enable:
-      - shadow
-  
-  gofmt:
-    simplify: true
-  
-  goimports:
-    local-prefixes: github.com/felixgeelhaar/GopherFrame
-
-  gocritic:
-    enabled-tags:
-      - performance
-      - style
-      - experimental
-    disabled-checks:
-      - wrapperFunc
-      - hugeParam
-      - deferInLoop
-
-  misspell:
-    locale: US
-
-  errcheck:
-    check-type-assertions: false
-    check-blank: false
-    exclude-functions:
-      - fmt.Print
-      - fmt.Printf
-      - fmt.Println
-      - fmt.Fprint
-      - fmt.Fprintf
-      - fmt.Fprintln
-      - os.Stderr.Write
-      - (io.Closer).Close
-      - (*os.File).Close
-      - (*os.File).Write
-      - (*bufio.Writer).Flush
-
-  depguard:
-    rules:
-      main:
-        files:
-          - $all
-        allow:
-          - $gostd
-          - github.com/felixgeelhaar/GopherFrame
-          - github.com/apache/arrow-go/v18
-          - github.com/leanovate/gopter
 
 linters:
+  default: standard
   enable:
     - bodyclose
     - dogsled
     - errcheck
-    - gofmt
     - gosimple
     - ineffassign
     - staticcheck
@@ -71,49 +17,10 @@ linters:
     - unused
     - whitespace
 
-  disable:
-    - depguard
-    - dupl
-    - gochecknoinits
-    - gochecknoglobals
-    - gocognit
-    - goconst
-    - gocritic
-    - gocyclo
-    - godox
-    - goimports
-    - gosec
-    - govet
-    - lll
-    - misspell
-    - nakedret
-    - prealloc
-    - revive
-    - unparam
+formatters:
+  enable:
+    - gofmt
 
 issues:
-  exclude-rules:
-    # Disable certain linters for test files
-    - path: _test\.go
-      linters:
-        - errcheck
-        - dupl
-        - gosec
-        - govet
-    
-    # Allow unused helper functions in expression package
-    - path: pkg/expr/
-      text: "is unused"
-      linters:
-        - unused
-    
-    # Exclude generated or vendor code
-    - path: vendor/
-      linters:
-        - errcheck
-        - unused
-        - staticcheck
-
-  exclude-use-default: true
   max-issues-per-linter: 100
   max-same-issues: 20
