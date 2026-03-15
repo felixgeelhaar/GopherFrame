@@ -244,5 +244,5 @@ jobs:
         echo "Detected bump level: $LEVEL"
         relicta bump --level "$LEVEL"
         relicta notes
-        relicta approve --ci
-        relicta publish
+        relicta approve --yes --ci
+        relicta publish --ci
