@@ -238,4 +238,4 @@ jobs:
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: |
-        relicta release --ci --clean
+        relicta release --ci --clean --yes
