@@ -227,10 +227,19 @@ jobs:
       with:
         fetch-depth: 0
 
+    - name: Install Relicta
+      run: |
+        curl -sSfL https://github.com/relicta-tech/relicta/releases/latest/download/relicta_linux_amd64.tar.gz -o relicta.tar.gz
+        tar xzf relicta.tar.gz
+        chmod +x relicta
+        sudo mv relicta /usr/local/bin/
+
     - name: Run Relicta release
-      uses: relicta-tech/relicta-action@v2
-      with:
-        github-token: ${{ secrets.GITHUB_TOKEN }}
-        command: full
-        config: .relicta.yaml
-        auto-approve: true
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      run: |
+        relicta plan --no-ai
+        relicta bump --level auto
+        relicta notes
+        relicta approve --message "CI auto-release"
+        relicta publish
