@@ -234,6 +234,7 @@ jobs:
         chmod +x relicta
         sudo mv relicta /usr/local/bin/
         relicta plugin install github
+        relicta plugin enable github
 
     - name: Run Relicta release
       env:
