@@ -59,8 +59,11 @@ plugins:
       path: ""
       config:
         draft: false
-      hooks: []
-      timeout: 0s
+        generate_release_notes: true
+      hooks:
+        - post_publish
+        - on_success
+      timeout: 30s
       continueonerror: false
       capabilities: null
 versioning:
