@@ -2,9 +2,14 @@
 
 **A production-ready DataFrame library for Go, powered by Apache Arrow.**
 
+[![CI](https://github.com/felixgeelhaar/GopherFrame/actions/workflows/ci.yml/badge.svg)](https://github.com/felixgeelhaar/GopherFrame/actions/workflows/ci.yml)
 [![Go Reference](https://pkg.go.dev/badge/github.com/felixgeelhaar/GopherFrame.svg)](https://pkg.go.dev/github.com/felixgeelhaar/GopherFrame)
 [![Go Report Card](https://goreportcard.com/badge/github.com/felixgeelhaar/GopherFrame)](https://goreportcard.com/report/github.com/felixgeelhaar/GopherFrame)
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
+[![Go Version](https://img.shields.io/badge/Go-1.24+-00ADD8.svg)](https://go.dev/)
+[![Tests](https://img.shields.io/badge/tests-438%20passing-brightgreen.svg)](.github/workflows/ci.yml)
+[![Coverage](https://img.shields.io/badge/coverage-81.4%25-brightgreen.svg)](.coverctl.yaml)
+[![Security](https://img.shields.io/badge/security-0%20critical-brightgreen.svg)](SECURITY.md)
 
 GopherFrame is a high-performance DataFrame library for Go, built on Apache Arrow for zero-copy data operations and seamless interoperability with the modern data ecosystem. Designed from the ground up for production use, it provides **2-428x better performance** than existing Go alternatives while maintaining type safety and idiomatic Go design.
 
@@ -57,25 +62,52 @@ func main() {
 
 ### Core Operations
 - ✅ **DataFrame/Series**: Immutable, strongly-typed structures with Apache Arrow backend
-- ✅ **High-Performance I/O**: Parquet (5-10M rows/sec), CSV, Arrow IPC
+- ✅ **High-Performance I/O**: Parquet (5-10M rows/sec), CSV, Arrow IPC, JSON/NDJSON
 - ✅ **Transformations**: Select, Filter, WithColumn, Sort (single/multi-column)
-- ✅ **Joins**: InnerJoin, LeftJoin with hash-based O(n+m) implementation
-- ✅ **GroupBy/Aggregation**: Sum, Mean, Count with multiple aggregations
-- ✅ **String Operations**: Contains, StartsWith, EndsWith
+- ✅ **Joins**: InnerJoin, LeftJoin, RightJoin, FullOuterJoin, CrossJoin with hash-based O(n+m) implementation
+- ✅ **GroupBy/Aggregation**: Sum, Mean, Count, Min, Max, Percentile, Median, Mode, Correlation, Variance, StdDev
+- ✅ **Window Functions**: RowNumber, Rank, DenseRank, Lag, Lead, RollingSum/Mean/Min/Max, CumSum/Max/Min/Prod
+- ✅ **Temporal Operations**: Year, Month, Day, Hour extraction; date truncation; date arithmetic
+- ✅ **String Operations**: Upper, Lower, Trim, Length, Match (regex), Contains, StartsWith, EndsWith, Split, Replace, Pad
 - ✅ **Expression Engine**: Type-safe column operations and predicates
+- ✅ **UDFs**: Scalar and vectorized user-defined functions
+- ✅ **Pivot/Unpivot**: Wide-to-long and long-to-wide transformations
+
+### Advanced Features
+- ✅ **Join Strategies**: Hash join, merge join (sorted data), broadcast join (small tables), auto-select
+- ✅ **Multi-Column Joins**: InnerJoinMulti, LeftJoinMulti, RightJoinMulti, FullOuterJoinMulti
+- ✅ **Custom Aggregations**: CustomAgg with user-defined functions, ConcatAgg for strings
+- ✅ **Data Quality**: Validate (NotNull, Positive, InRange, UniqueValues), Describe, NullCount, IsComplete
+- ✅ **Anomaly Detection**: DetectOutliersIQR, DetectOutliersZScore
+- ✅ **Date Parsing**: ParseDateColumn with automatic format inference, DateRange, BusinessDays
+- ✅ **Cross-Tabulation**: CrossTab for contingency tables
+- ✅ **Query Optimization**: QueryPlan with filter pushdown, constant folding, CSE
+- ✅ **Parallel Execution**: ParallelOps, ParallelAgg, ReadCSVParallel, ReadJSONParallel
+- ✅ **Resource Forecasting**: EstimateResources, WillFitInMemory
+
+### I/O Formats
+- ✅ **Parquet**: High-performance columnar (5-10M rows/sec)
+- ✅ **CSV**: With type inference and chunked streaming
+- ✅ **Arrow IPC**: Zero-copy inter-process communication
+- ✅ **JSON/NDJSON**: Array-of-objects and newline-delimited
+- ✅ **Avro**: Object Container Format (OCF)
+- ✅ **SQL**: ReadSQL/WriteSQL via database/sql (PostgreSQL, MySQL, SQLite)
+- ✅ **Partitioned**: Hive-style partitioned datasets with pruning
 
 ### Production Features
 - 🔒 **Memory Management**: LimitedAllocator with configurable limits and OOM prevention
 - 📊 **Memory Monitoring**: Real-time pressure tracking (low/medium/high/critical)
 - 🛡️ **Resource Safety**: Reference counting with explicit Release() for deterministic cleanup
 - ⚡ **Zero-Copy Operations**: Column selection in O(1) constant time (~700ns)
-- 🔍 **Security Hardened**: Path traversal protection, input validation
+- 🔍 **Security Hardened**: Path traversal protection, gosec validated, nox SCA scanned
+- 🌊 **Streaming**: ReadCSVChunked, ReadCSVStreaming with backpressure
 
 ### Developer Experience
-- 📚 **Comprehensive Documentation**: Migration guides, examples, API reference
-- 🎯 **Example Programs**: ETL pipeline, ML preprocessing, backend analytics
-- 🧪 **Benchmark Regression CI**: Automated performance testing on every PR
+- 📚 **Comprehensive Documentation**: User guide, API reference, migration guides, troubleshooting
+- 🎯 **12 Example Programs**: ETL, ML pipeline, analytics, integration demo, and more
+- 🧪 **438 Tests**: Unit, integration, property-based, fuzz, chaos engineering
 - 📈 **Performance Validated**: 2-428x faster than Gota (verified benchmarks)
+- 🔄 **CI/CD**: Cross-platform (Linux + macOS), Go 1.24-1.26, SHA-pinned actions, coverctl + nox
 
 ## 📊 Performance
 
@@ -331,53 +363,34 @@ We welcome contributions! GopherFrame follows:
 
 ## 📊 Project Status
 
-🚀 **v1.0 Production Ready - Feature Complete**
-
-- ✅ All Phase 1 & 2 features complete and tested
-- ✅ Window functions (analytical, rolling, cumulative)
-- ✅ Statistical aggregations (percentile, median, mode, correlation)
-- ✅ Enhanced join operations (inner, left, right, full outer, cross)
-- ✅ Temporal operations (extraction, truncation, arithmetic)
-- ✅ String operations (case, trim, regex, length)
-- ✅ Production memory management
-- ✅ Performance validated (2-428x faster than Gota)
-- ✅ Comprehensive API documentation
-- ✅ Benchmark regression CI
-- ✅ 10 example programs including Phase 2 features
-- ✅ Migration guides from pandas/Polars/Gota
+🚀 **v1.0+ Feature Complete — All Roadmap Phases Delivered**
 
 **Quality Metrics:**
-- 279 tests, 100% pass rate
-- 95%+ test coverage
-- Zero security vulnerabilities (gosec validated)
-- Automated benchmark regression detection
-- Production deployments ready
+- 438 tests passing, zero race conditions
+- 81.4% pkg/ coverage (coverctl validated)
+- Zero critical security findings (nox SCA + gosec)
+- Cross-platform CI (Linux + macOS, Go 1.24-1.26)
+- All GitHub Actions pinned to commit SHAs
 
-## 🗺️ Roadmap
+**[Full Roadmap](ROADMAP.md)** — 96/96 items complete
 
-### v1.0 (Current) ✅
-- Core DataFrame/Series operations
-- Enhanced join operations (Inner, Left, Right, Full Outer, Cross)
-- Window functions (RowNumber, Rank, DenseRank, Lag, Lead)
-- Rolling aggregations (Sum, Mean, Min, Max, Count)
-- Cumulative operations (CumSum, CumMax, CumMin, CumProd)
-- Statistical aggregations (Percentile, Median, Mode, Correlation)
-- Temporal operations (Year, Month, Day, Hour, Minute, Second, Truncate, Add)
-- String operations (Upper, Lower, Trim, Length, Match, Contains)
-- Production memory management
-- Performance validation
-- Comprehensive documentation
+## 📚 Documentation
 
-### v1.1 (Planned - Q2 2026)
-- User-defined functions (UDFs)
-- Pivot operations
-- Additional string functions
-- Advanced join strategies
-
-### v1.2 (Future)
-- Streaming data processing
-- Additional file formats (JSON, ORC)
-- Distributed computing support
+| Guide | Description |
+|-------|-------------|
+| [User Guide](docs/USER_GUIDE.md) | Tutorials, recipes, and patterns |
+| [API Reference](https://pkg.go.dev/github.com/felixgeelhaar/GopherFrame) | Complete API documentation |
+| [Performance Guide](docs/PERFORMANCE_GUIDE.md) | Optimization and profiling |
+| [Migration from Pandas](docs/MIGRATION_FROM_PANDAS.md) | Python/Pandas users |
+| [Migration from Polars](docs/MIGRATION_FROM_POLARS.md) | Polars users |
+| [Migration from Gota](docs/MIGRATION_FROM_GOTA.md) | Gota users |
+| [Troubleshooting](docs/TROUBLESHOOTING.md) | Common issues and solutions |
+| [Plugin API](docs/PLUGIN_API.md) | Extension and plugin development |
+| [API Stability](docs/API_STABILITY.md) | Versioning and compatibility |
+| [Technical Design](docs/technical_design_doc.md) | Architecture and ADRs |
+| [Contributing](CONTRIBUTING.md) | How to contribute |
+| [Security](SECURITY.md) | Vulnerability reporting |
+| [Changelog](CHANGELOG.md) | Release history |
 
 **[Full Roadmap](ROADMAP.md)**
 

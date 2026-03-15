@@ -3,7 +3,9 @@ package gopherframe
 
 import (
 	"fmt"
+	"math"
 	"sort"
+	"strings"
 
 	"github.com/apache/arrow-go/v18/arrow"
 	"github.com/apache/arrow-go/v18/arrow/array"
@@ -79,6 +81,22 @@ func (gdf *GroupedDataFrame) performGroupBy(aggregations []Aggregation) (*DataFr
 // performSingleColumnGroupBy handles single column grouping
 func (gdf *GroupedDataFrame) performSingleColumnGroupBy(aggregations []Aggregation) (*DataFrame, error) {
 	groupCol := gdf.groupByCols[0]
+
+	// Handle empty DataFrame
+	if gdf.df.NumRows() == 0 {
+		pool := memory.NewGoAllocator()
+		resultFields := []arrow.Field{{Name: groupCol, Type: arrow.BinaryTypes.String}}
+		resultColumns := []arrow.Array{array.NewStringBuilder(pool).NewArray()}
+		for _, agg := range aggregations {
+			resultFields = append(resultFields, arrow.Field{Name: agg.Name(), Type: arrow.PrimitiveTypes.Float64})
+			b := array.NewFloat64Builder(pool)
+			resultColumns = append(resultColumns, b.NewArray())
+			b.Release()
+		}
+		resultSchema := arrow.NewSchema(resultFields, nil)
+		resultRecord := array.NewRecord(resultSchema, resultColumns, 0)
+		return NewDataFrame(resultRecord), nil
+	}
 
 	// Get the grouping column
 	groupSeries, err := gdf.df.coreDF.Column(groupCol)
@@ -179,7 +197,17 @@ func (gdf *GroupedDataFrame) performAggregation(agg Aggregation, groupIndices ma
 		return gdf.performMin(aggSeries, groupIndices, agg.Name(), pool)
 	case "max":
 		return gdf.performMax(aggSeries, groupIndices, agg.Name(), pool)
+	case "variance":
+		return gdf.performVariance(aggSeries, groupIndices, agg.Name(), pool)
+	case "stddev":
+		return gdf.performStdDev(aggSeries, groupIndices, agg.Name(), pool)
+	case "custom":
+		return gdf.performCustomAgg(aggSeries, groupIndices, agg.Name(), pool)
 	default:
+		if strings.HasPrefix(agg.operation, "concat:") {
+			sep := strings.TrimPrefix(agg.operation, "concat:")
+			return gdf.performConcatAgg(aggSeries, groupIndices, agg.Name(), sep, pool)
+		}
 		return arrow.Field{}, nil, fmt.Errorf("unsupported aggregation: %s", agg.operation)
 	}
 }
@@ -434,6 +462,55 @@ func Max(column string) Aggregation {
 	}
 }
 
+// Variance creates a sample variance aggregation (N-1 denominator).
+func Variance(column string) Aggregation {
+	return Aggregation{
+		column:    column,
+		operation: "variance",
+		alias:     column + "_variance",
+	}
+}
+
+// StdDev creates a sample standard deviation aggregation (sqrt of sample variance).
+func StdDev(column string) Aggregation {
+	return Aggregation{
+		column:    column,
+		operation: "stddev",
+		alias:     column + "_stddev",
+	}
+}
+
+// ConcatAgg creates a string concatenation aggregation (concat_ws).
+// It joins all non-null string values in each group with the given separator.
+func ConcatAgg(column, separator string) Aggregation {
+	return Aggregation{
+		column:    column,
+		operation: "concat:" + separator,
+		alias:     column + "_concat",
+	}
+}
+
+// CustomAggFunc is a function that takes a slice of float64 values and returns a single float64 result.
+type CustomAggFunc func(values []float64) float64
+
+// customAggregation extends Aggregation with a custom function.
+
+// CustomAgg creates an aggregation with a user-defined function.
+func CustomAgg(column string, alias string, fn CustomAggFunc) Aggregation {
+	// Store the function pointer in the operation field with a marker
+	a := Aggregation{
+		column:    column,
+		operation: "custom",
+		alias:     alias,
+	}
+	// Register the function in the package-level registry
+	customAggFuncs[alias] = fn
+	return a
+}
+
+// customAggFuncs is a package-level registry for custom aggregation functions.
+var customAggFuncs = make(map[string]CustomAggFunc)
+
 // As sets a custom name for the aggregation result.
 func (a Aggregation) As(alias string) Aggregation {
 	a.alias = alias
@@ -443,6 +520,100 @@ func (a Aggregation) As(alias string) Aggregation {
 // Name returns the name of the aggregation result column.
 func (a Aggregation) Name() string {
 	return a.alias
+}
+
+// performVariance calculates sample variance for each group using a two-pass algorithm.
+// Returns null for groups with fewer than 2 non-null values.
+func (gdf *GroupedDataFrame) performVariance(series *core.Series, groupIndices map[string][]int, name string, pool memory.Allocator) (arrow.Field, arrow.Array, error) {
+	if series.DataType().ID() != arrow.FLOAT64 {
+		return arrow.Field{}, nil, fmt.Errorf("variance aggregation only supports float64, got %s", series.DataType())
+	}
+
+	builder := array.NewFloat64Builder(pool)
+	defer builder.Release()
+
+	// Sort keys to maintain consistent order
+	var keys []string
+	for key := range groupIndices {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+
+	for _, key := range keys {
+		indices := groupIndices[key]
+
+		// First pass: calculate mean and count non-null values
+		sum := 0.0
+		count := 0
+		for _, idx := range indices {
+			if !series.IsNull(idx) {
+				val, err := series.GetFloat64(idx)
+				if err != nil {
+					return arrow.Field{}, nil, fmt.Errorf("failed to get float64 value: %w", err)
+				}
+				sum += val
+				count++
+			}
+		}
+
+		// Need at least 2 values for sample variance
+		if count < 2 {
+			builder.AppendNull()
+			continue
+		}
+
+		mean := sum / float64(count)
+
+		// Second pass: sum of squared deviations
+		sumSquaredDev := 0.0
+		for _, idx := range indices {
+			if !series.IsNull(idx) {
+				val, err := series.GetFloat64(idx)
+				if err != nil {
+					return arrow.Field{}, nil, fmt.Errorf("failed to get float64 value: %w", err)
+				}
+				diff := val - mean
+				sumSquaredDev += diff * diff
+			}
+		}
+
+		// Sample variance uses N-1 denominator (Bessel's correction)
+		variance := sumSquaredDev / float64(count-1)
+		builder.Append(variance)
+	}
+
+	field := arrow.Field{Name: name, Type: arrow.PrimitiveTypes.Float64}
+	return field, builder.NewArray(), nil
+}
+
+// performStdDev calculates sample standard deviation for each group.
+// This is the square root of the sample variance.
+func (gdf *GroupedDataFrame) performStdDev(series *core.Series, groupIndices map[string][]int, name string, pool memory.Allocator) (arrow.Field, arrow.Array, error) {
+	// Calculate variance first
+	_, varianceArray, err := gdf.performVariance(series, groupIndices, name, pool)
+	if err != nil {
+		return arrow.Field{}, nil, err
+	}
+	defer varianceArray.Release()
+
+	builder := array.NewFloat64Builder(pool)
+	defer builder.Release()
+
+	varianceFloat, ok := varianceArray.(*array.Float64)
+	if !ok {
+		return arrow.Field{}, nil, fmt.Errorf("unexpected array type for variance result")
+	}
+
+	for i := 0; i < varianceFloat.Len(); i++ {
+		if varianceFloat.IsNull(i) {
+			builder.AppendNull()
+		} else {
+			builder.Append(math.Sqrt(varianceFloat.Value(i)))
+		}
+	}
+
+	field := arrow.Field{Name: name, Type: arrow.PrimitiveTypes.Float64}
+	return field, builder.NewArray(), nil
 }
 
 // performMultiColumnGroupBy handles multi-column grouping
@@ -606,4 +777,85 @@ func appendValueFromSeries(builder array.Builder, series *core.Series, index int
 		return fmt.Errorf("unsupported builder type")
 	}
 	return nil
+}
+
+// performConcatAgg concatenates string values in each group with a separator.
+func (gdf *GroupedDataFrame) performConcatAgg(series *core.Series, groupIndices map[string][]int, name, separator string, pool memory.Allocator) (arrow.Field, arrow.Array, error) {
+	builder := array.NewStringBuilder(pool)
+	defer builder.Release()
+
+	var keys []string
+	for key := range groupIndices {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+
+	for _, key := range keys {
+		indices := groupIndices[key]
+		var parts []string
+
+		for _, idx := range indices {
+			if !series.IsNull(idx) {
+				val, err := series.GetString(idx)
+				if err != nil {
+					return arrow.Field{}, nil, fmt.Errorf("failed to get string value: %w", err)
+				}
+				parts = append(parts, val)
+			}
+		}
+
+		if len(parts) > 0 {
+			builder.Append(strings.Join(parts, separator))
+		} else {
+			builder.AppendNull()
+		}
+	}
+
+	field := arrow.Field{Name: name, Type: arrow.BinaryTypes.String}
+	return field, builder.NewArray(), nil
+}
+
+// performCustomAgg executes a custom aggregation function for each group.
+func (gdf *GroupedDataFrame) performCustomAgg(series *core.Series, groupIndices map[string][]int, name string, pool memory.Allocator) (arrow.Field, arrow.Array, error) {
+	fn, ok := customAggFuncs[name]
+	if !ok {
+		return arrow.Field{}, nil, fmt.Errorf("custom aggregation function not found: %s", name)
+	}
+
+	if series.DataType().ID() != arrow.FLOAT64 {
+		return arrow.Field{}, nil, fmt.Errorf("custom aggregation only supports float64, got %s", series.DataType())
+	}
+
+	builder := array.NewFloat64Builder(pool)
+	defer builder.Release()
+
+	var keys []string
+	for key := range groupIndices {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+
+	for _, key := range keys {
+		indices := groupIndices[key]
+		var values []float64
+
+		for _, idx := range indices {
+			if !series.IsNull(idx) {
+				val, err := series.GetFloat64(idx)
+				if err != nil {
+					return arrow.Field{}, nil, fmt.Errorf("failed to get float64 value: %w", err)
+				}
+				values = append(values, val)
+			}
+		}
+
+		if len(values) > 0 {
+			builder.Append(fn(values))
+		} else {
+			builder.AppendNull()
+		}
+	}
+
+	field := arrow.Field{Name: name, Type: arrow.PrimitiveTypes.Float64}
+	return field, builder.NewArray(), nil
 }

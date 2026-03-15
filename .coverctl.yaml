@@ -1,0 +1,14 @@
+version: 1
+language: go
+policy:
+  default:
+    min: 60
+  domains:
+    - name: cmd
+      match:
+        - ./cmd/...
+      min: 0
+    - name: pkg
+      match:
+        - ./pkg/...
+      min: 60

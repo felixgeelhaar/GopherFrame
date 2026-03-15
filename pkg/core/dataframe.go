@@ -2080,3 +2080,342 @@ func (df *DataFrame) buildJoinedArray(pool memory.Allocator, sourceArray arrow.A
 		return builder.NewArray()
 	}
 }
+
+// JoinMulti performs a join operation on multiple key columns between this DataFrame and another.
+//
+// This method extends the single-key Join by building composite hash keys from multiple
+// columns. It uses the same hash join algorithm with O(n+m) complexity.
+//
+// Parameters:
+//   - other: DataFrame to join with (right side)
+//   - leftKeys: Column names in this DataFrame to join on
+//   - rightKeys: Column names in other DataFrame to join on (must have same length as leftKeys)
+//   - joinType: Type of join (InnerJoin, LeftJoin, RightJoin, FullOuterJoin)
+//
+// Returns:
+//   - *DataFrame: New DataFrame containing the join result
+//   - error: Returns error if keys have mismatched lengths, columns not found, or join fails
+//
+// Complexity: O(n+m) where n=left rows, m=right rows (hash join)
+func (df *DataFrame) JoinMulti(other *DataFrame, leftKeys, rightKeys []string, joinType JoinType) (*DataFrame, error) {
+	if other == nil {
+		return nil, fmt.Errorf("other DataFrame cannot be nil")
+	}
+
+	if len(leftKeys) != len(rightKeys) {
+		return nil, fmt.Errorf("leftKeys and rightKeys must have the same length: got %d and %d", len(leftKeys), len(rightKeys))
+	}
+
+	if len(leftKeys) == 0 {
+		return nil, fmt.Errorf("join keys cannot be empty")
+	}
+
+	// Validate all key columns exist
+	for _, key := range leftKeys {
+		if !df.HasColumn(key) {
+			return nil, fmt.Errorf("left join key column not found: %s", key)
+		}
+	}
+	for _, key := range rightKeys {
+		if !other.HasColumn(key) {
+			return nil, fmt.Errorf("right join key column not found: %s", key)
+		}
+	}
+
+	// Get key arrays
+	leftKeyArrays := make([]arrow.Array, len(leftKeys))
+	rightKeyArrays := make([]arrow.Array, len(rightKeys))
+	for i, key := range leftKeys {
+		leftKeyArrays[i] = df.record.Column(df.getColumnIndex(key))
+	}
+	for i, key := range rightKeys {
+		rightKeyArrays[i] = other.record.Column(other.getColumnIndex(key))
+	}
+
+	switch joinType {
+	case InnerJoin:
+		return df.performInnerJoinMulti(other, leftKeys, rightKeys, leftKeyArrays, rightKeyArrays)
+	case LeftJoin:
+		return df.performLeftJoinMulti(other, leftKeys, rightKeys, leftKeyArrays, rightKeyArrays)
+	case RightJoin:
+		return df.performRightJoinMulti(other, leftKeys, rightKeys, leftKeyArrays, rightKeyArrays)
+	case FullOuterJoin:
+		return df.performFullOuterJoinMulti(other, leftKeys, rightKeys, leftKeyArrays, rightKeyArrays)
+	default:
+		return nil, fmt.Errorf("unsupported join type for multi-key join: %d", joinType)
+	}
+}
+
+// InnerJoinMulti performs an inner join on multiple key columns.
+//
+// Complexity: O(n+m) where n=left rows, m=right rows (hash join)
+func (df *DataFrame) InnerJoinMulti(other *DataFrame, leftKeys, rightKeys []string) (*DataFrame, error) {
+	return df.JoinMulti(other, leftKeys, rightKeys, InnerJoin)
+}
+
+// LeftJoinMulti performs a left join on multiple key columns.
+//
+// Complexity: O(n+m) where n=left rows, m=right rows (hash join)
+func (df *DataFrame) LeftJoinMulti(other *DataFrame, leftKeys, rightKeys []string) (*DataFrame, error) {
+	return df.JoinMulti(other, leftKeys, rightKeys, LeftJoin)
+}
+
+// RightJoinMulti performs a right join on multiple key columns.
+//
+// Complexity: O(n+m) where n=left rows, m=right rows (hash join)
+func (df *DataFrame) RightJoinMulti(other *DataFrame, leftKeys, rightKeys []string) (*DataFrame, error) {
+	return df.JoinMulti(other, leftKeys, rightKeys, RightJoin)
+}
+
+// FullOuterJoinMulti performs a full outer join on multiple key columns.
+//
+// Complexity: O(n+m) where n=left rows, m=right rows (hash join)
+func (df *DataFrame) FullOuterJoinMulti(other *DataFrame, leftKeys, rightKeys []string) (*DataFrame, error) {
+	return df.JoinMulti(other, leftKeys, rightKeys, FullOuterJoin)
+}
+
+// buildCompositeKey builds a composite hash key string from multiple columns at a given row.
+// Uses "\x00" as separator to avoid collisions (e.g., "ab"+"c" vs "a"+"bc").
+// Returns "" and false if any key column has a null value at the given row.
+func buildCompositeKey(arrays []arrow.Array, row int) (string, bool) {
+	var key string
+	for i, arr := range arrays {
+		if arr.IsNull(row) {
+			return "", false
+		}
+		val := extractValue(arr, row)
+		if val == nil {
+			return "", false
+		}
+		if i > 0 {
+			key += "\x00"
+		}
+		key += fmt.Sprintf("%v", val)
+	}
+	return key, true
+}
+
+// performInnerJoinMulti implements inner join logic with composite keys.
+func (df *DataFrame) performInnerJoinMulti(other *DataFrame, leftKeys, rightKeys []string, leftKeyArrays, rightKeyArrays []arrow.Array) (*DataFrame, error) {
+	rightHashMap := make(map[string][]int)
+
+	numRightRows := rightKeyArrays[0].Len()
+	for i := 0; i < numRightRows; i++ {
+		key, valid := buildCompositeKey(rightKeyArrays, i)
+		if !valid {
+			continue
+		}
+		rightHashMap[key] = append(rightHashMap[key], i)
+	}
+
+	var leftIndices, rightIndices []int
+	numLeftRows := leftKeyArrays[0].Len()
+	for i := 0; i < numLeftRows; i++ {
+		key, valid := buildCompositeKey(leftKeyArrays, i)
+		if !valid {
+			continue
+		}
+		if rightRows, exists := rightHashMap[key]; exists {
+			for _, rightRow := range rightRows {
+				leftIndices = append(leftIndices, i)
+				rightIndices = append(rightIndices, rightRow)
+			}
+		}
+	}
+
+	return df.buildJoinResultMulti(other, leftKeys, rightKeys, leftIndices, rightIndices, false)
+}
+
+// performLeftJoinMulti implements left join logic with composite keys.
+func (df *DataFrame) performLeftJoinMulti(other *DataFrame, leftKeys, rightKeys []string, leftKeyArrays, rightKeyArrays []arrow.Array) (*DataFrame, error) {
+	rightHashMap := make(map[string][]int)
+
+	numRightRows := rightKeyArrays[0].Len()
+	for i := 0; i < numRightRows; i++ {
+		key, valid := buildCompositeKey(rightKeyArrays, i)
+		if !valid {
+			continue
+		}
+		rightHashMap[key] = append(rightHashMap[key], i)
+	}
+
+	var leftIndices, rightIndices []int
+	numLeftRows := leftKeyArrays[0].Len()
+	for i := 0; i < numLeftRows; i++ {
+		key, valid := buildCompositeKey(leftKeyArrays, i)
+		if !valid {
+			// Null key: include left row with no right match
+			leftIndices = append(leftIndices, i)
+			rightIndices = append(rightIndices, -1)
+			continue
+		}
+		if rightRows, exists := rightHashMap[key]; exists {
+			for _, rightRow := range rightRows {
+				leftIndices = append(leftIndices, i)
+				rightIndices = append(rightIndices, rightRow)
+			}
+		} else {
+			leftIndices = append(leftIndices, i)
+			rightIndices = append(rightIndices, -1)
+		}
+	}
+
+	return df.buildJoinResultMulti(other, leftKeys, rightKeys, leftIndices, rightIndices, true)
+}
+
+// performRightJoinMulti implements right join logic with composite keys.
+func (df *DataFrame) performRightJoinMulti(other *DataFrame, leftKeys, rightKeys []string, leftKeyArrays, rightKeyArrays []arrow.Array) (*DataFrame, error) {
+	leftHashMap := make(map[string][]int)
+
+	numLeftRows := leftKeyArrays[0].Len()
+	for i := 0; i < numLeftRows; i++ {
+		key, valid := buildCompositeKey(leftKeyArrays, i)
+		if !valid {
+			continue
+		}
+		leftHashMap[key] = append(leftHashMap[key], i)
+	}
+
+	var leftIndices, rightIndices []int
+	numRightRows := rightKeyArrays[0].Len()
+	for i := 0; i < numRightRows; i++ {
+		key, valid := buildCompositeKey(rightKeyArrays, i)
+		if !valid {
+			leftIndices = append(leftIndices, -1)
+			rightIndices = append(rightIndices, i)
+			continue
+		}
+		if leftRows, exists := leftHashMap[key]; exists {
+			for _, leftRow := range leftRows {
+				leftIndices = append(leftIndices, leftRow)
+				rightIndices = append(rightIndices, i)
+			}
+		} else {
+			leftIndices = append(leftIndices, -1)
+			rightIndices = append(rightIndices, i)
+		}
+	}
+
+	return df.buildJoinResultMulti(other, leftKeys, rightKeys, leftIndices, rightIndices, true)
+}
+
+// performFullOuterJoinMulti implements full outer join logic with composite keys.
+func (df *DataFrame) performFullOuterJoinMulti(other *DataFrame, leftKeys, rightKeys []string, leftKeyArrays, rightKeyArrays []arrow.Array) (*DataFrame, error) {
+	rightHashMap := make(map[string][]int)
+	matchedRightRows := make(map[int]bool)
+
+	numRightRows := rightKeyArrays[0].Len()
+	for i := 0; i < numRightRows; i++ {
+		key, valid := buildCompositeKey(rightKeyArrays, i)
+		if !valid {
+			continue
+		}
+		rightHashMap[key] = append(rightHashMap[key], i)
+	}
+
+	var leftIndices, rightIndices []int
+
+	// First pass: all left rows
+	numLeftRows := leftKeyArrays[0].Len()
+	for i := 0; i < numLeftRows; i++ {
+		key, valid := buildCompositeKey(leftKeyArrays, i)
+		if !valid {
+			leftIndices = append(leftIndices, i)
+			rightIndices = append(rightIndices, -1)
+			continue
+		}
+		if rightRows, exists := rightHashMap[key]; exists {
+			for _, rightRow := range rightRows {
+				leftIndices = append(leftIndices, i)
+				rightIndices = append(rightIndices, rightRow)
+				matchedRightRows[rightRow] = true
+			}
+		} else {
+			leftIndices = append(leftIndices, i)
+			rightIndices = append(rightIndices, -1)
+		}
+	}
+
+	// Second pass: unmatched right rows
+	for i := 0; i < numRightRows; i++ {
+		if !matchedRightRows[i] {
+			leftIndices = append(leftIndices, -1)
+			rightIndices = append(rightIndices, i)
+		}
+	}
+
+	return df.buildJoinResultMulti(other, leftKeys, rightKeys, leftIndices, rightIndices, true)
+}
+
+// buildJoinResultMulti constructs the final joined DataFrame for multi-key joins.
+// It skips all right key columns (since the left keys are kept) and handles name conflicts.
+func (df *DataFrame) buildJoinResultMulti(other *DataFrame, leftKeys, rightKeys []string, leftIndices, rightIndices []int, allowNulls bool) (*DataFrame, error) {
+	if len(leftIndices) != len(rightIndices) {
+		return nil, fmt.Errorf("internal error: index arrays length mismatch")
+	}
+
+	leftSchema := df.record.Schema()
+	rightSchema := other.record.Schema()
+
+	// Build set of right key column names to skip
+	rightKeySet := make(map[string]bool, len(rightKeys))
+	for _, key := range rightKeys {
+		rightKeySet[key] = true
+	}
+
+	// Build result schema
+	var resultFields []arrow.Field
+	columnNameMap := make(map[string]bool)
+
+	// Add all left columns
+	for _, field := range leftSchema.Fields() {
+		resultFields = append(resultFields, field)
+		columnNameMap[field.Name] = true
+	}
+
+	// Add right columns, skipping join keys and handling name conflicts
+	for _, field := range rightSchema.Fields() {
+		if rightKeySet[field.Name] {
+			continue
+		}
+		fieldName := field.Name
+		if columnNameMap[fieldName] {
+			fieldName = "right_" + fieldName
+		}
+		resultFields = append(resultFields, arrow.Field{
+			Name: fieldName,
+			Type: field.Type,
+		})
+		columnNameMap[fieldName] = true
+	}
+
+	resultSchema := arrow.NewSchema(resultFields, nil)
+
+	resultArrays := make([]arrow.Array, len(resultFields))
+	pool := memory.NewGoAllocator()
+
+	fieldIndex := 0
+
+	// Process left columns
+	for i, field := range leftSchema.Fields() {
+		resultArrays[fieldIndex] = df.buildJoinedArray(pool, df.record.Column(i), leftIndices, field.Type, false, int(df.record.NumRows()))
+		fieldIndex++
+	}
+
+	// Process right columns (excluding join keys)
+	for i, field := range rightSchema.Fields() {
+		if rightKeySet[field.Name] {
+			continue
+		}
+		resultArrays[fieldIndex] = df.buildJoinedArray(pool, other.record.Column(i), rightIndices, field.Type, allowNulls, int(other.record.NumRows()))
+		fieldIndex++
+	}
+
+	resultRecord := array.NewRecord(resultSchema, resultArrays, int64(len(leftIndices)))
+
+	for _, arr := range resultArrays {
+		arr.Release()
+	}
+
+	return NewDataFrame(resultRecord), nil
+}

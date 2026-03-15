@@ -2,14 +2,50 @@ version: "2"
 
 run:
   timeout: 5m
+  go: '1.24'
 
 linters:
-  default: standard
+  default: none
+  enable:
+    - bodyclose
+    - dogsled
+    - ineffassign
+    - staticcheck
+    - unconvert
+    - whitespace
+  settings:
+    staticcheck:
+      checks:
+        - "all"
+        - "-QF*"
+        - "-ST*"
 
 formatters:
   enable:
     - gofmt
 
 issues:
+  exclude-rules:
+    - path: _test\.go
+      linters:
+        - errcheck
+        - staticcheck
+        - unused
+
+    - path: pkg/expr/
+      text: "is unused"
+      linters:
+        - unused
+
+    - path: cmd/
+      linters:
+        - errcheck
+        - unused
+        - staticcheck
+
+    - path: pkg/domain/aggregation/
+      linters:
+        - staticcheck
+
   max-issues-per-linter: 100
   max-same-issues: 20

@@ -253,3 +253,142 @@ func (df *DataFrame) LeftJoin(other *DataFrame, leftKey, rightKey string) *DataF
 
 	return &DataFrame{coreDF: joinedCoreDF}
 }
+
+// RightJoin performs a right join with another DataFrame.
+// Returns all rows from the right DataFrame, and matching rows from the left DataFrame.
+// Non-matching rows from the left will have null values.
+// Example: df.RightJoin(other, "user_id", "id")
+func (df *DataFrame) RightJoin(other *DataFrame, leftKey, rightKey string) *DataFrame {
+	if df.err != nil {
+		return &DataFrame{err: df.err}
+	}
+	if other == nil {
+		return &DataFrame{err: fmt.Errorf("other DataFrame cannot be nil")}
+	}
+	if other.err != nil {
+		return &DataFrame{err: other.err}
+	}
+
+	joinedCoreDF, err := df.coreDF.RightJoin(other.coreDF, leftKey, rightKey)
+	if err != nil {
+		return &DataFrame{err: err}
+	}
+
+	return &DataFrame{coreDF: joinedCoreDF}
+}
+
+// FullOuterJoin performs a full outer join with another DataFrame.
+// Returns all rows from both DataFrames, with null values where there is no match.
+// Example: df.FullOuterJoin(other, "user_id", "id")
+func (df *DataFrame) FullOuterJoin(other *DataFrame, leftKey, rightKey string) *DataFrame {
+	if df.err != nil {
+		return &DataFrame{err: df.err}
+	}
+	if other == nil {
+		return &DataFrame{err: fmt.Errorf("other DataFrame cannot be nil")}
+	}
+	if other.err != nil {
+		return &DataFrame{err: other.err}
+	}
+
+	joinedCoreDF, err := df.coreDF.FullOuterJoin(other.coreDF, leftKey, rightKey)
+	if err != nil {
+		return &DataFrame{err: err}
+	}
+
+	return &DataFrame{coreDF: joinedCoreDF}
+}
+
+// InnerJoinMulti performs an inner join on multiple key columns.
+// Returns rows that have matching values in all specified key columns in both DataFrames.
+// leftKeys and rightKeys must have the same length.
+// Example: df.InnerJoinMulti(other, []string{"dept", "role"}, []string{"department", "position"})
+func (df *DataFrame) InnerJoinMulti(other *DataFrame, leftKeys, rightKeys []string) *DataFrame {
+	if df.err != nil {
+		return &DataFrame{err: df.err}
+	}
+	if other == nil {
+		return &DataFrame{err: fmt.Errorf("other DataFrame cannot be nil")}
+	}
+	if other.err != nil {
+		return &DataFrame{err: other.err}
+	}
+
+	joinedCoreDF, err := df.coreDF.InnerJoinMulti(other.coreDF, leftKeys, rightKeys)
+	if err != nil {
+		return &DataFrame{err: err}
+	}
+
+	return &DataFrame{coreDF: joinedCoreDF}
+}
+
+// LeftJoinMulti performs a left join on multiple key columns.
+// Returns all rows from the left DataFrame, with matching rows from the right DataFrame.
+// Non-matching rows from the right will have null values.
+// leftKeys and rightKeys must have the same length.
+// Example: df.LeftJoinMulti(other, []string{"dept", "role"}, []string{"department", "position"})
+func (df *DataFrame) LeftJoinMulti(other *DataFrame, leftKeys, rightKeys []string) *DataFrame {
+	if df.err != nil {
+		return &DataFrame{err: df.err}
+	}
+	if other == nil {
+		return &DataFrame{err: fmt.Errorf("other DataFrame cannot be nil")}
+	}
+	if other.err != nil {
+		return &DataFrame{err: other.err}
+	}
+
+	joinedCoreDF, err := df.coreDF.LeftJoinMulti(other.coreDF, leftKeys, rightKeys)
+	if err != nil {
+		return &DataFrame{err: err}
+	}
+
+	return &DataFrame{coreDF: joinedCoreDF}
+}
+
+// RightJoinMulti performs a right join on multiple key columns.
+// Returns all rows from the right DataFrame, with matching rows from the left DataFrame.
+// Non-matching rows from the left will have null values.
+// leftKeys and rightKeys must have the same length.
+// Example: df.RightJoinMulti(other, []string{"dept", "role"}, []string{"department", "position"})
+func (df *DataFrame) RightJoinMulti(other *DataFrame, leftKeys, rightKeys []string) *DataFrame {
+	if df.err != nil {
+		return &DataFrame{err: df.err}
+	}
+	if other == nil {
+		return &DataFrame{err: fmt.Errorf("other DataFrame cannot be nil")}
+	}
+	if other.err != nil {
+		return &DataFrame{err: other.err}
+	}
+
+	joinedCoreDF, err := df.coreDF.RightJoinMulti(other.coreDF, leftKeys, rightKeys)
+	if err != nil {
+		return &DataFrame{err: err}
+	}
+
+	return &DataFrame{coreDF: joinedCoreDF}
+}
+
+// FullOuterJoinMulti performs a full outer join on multiple key columns.
+// Returns all rows from both DataFrames, with null values where there is no match.
+// leftKeys and rightKeys must have the same length.
+// Example: df.FullOuterJoinMulti(other, []string{"dept", "role"}, []string{"department", "position"})
+func (df *DataFrame) FullOuterJoinMulti(other *DataFrame, leftKeys, rightKeys []string) *DataFrame {
+	if df.err != nil {
+		return &DataFrame{err: df.err}
+	}
+	if other == nil {
+		return &DataFrame{err: fmt.Errorf("other DataFrame cannot be nil")}
+	}
+	if other.err != nil {
+		return &DataFrame{err: other.err}
+	}
+
+	joinedCoreDF, err := df.coreDF.FullOuterJoinMulti(other.coreDF, leftKeys, rightKeys)
+	if err != nil {
+		return &DataFrame{err: err}
+	}
+
+	return &DataFrame{coreDF: joinedCoreDF}
+}

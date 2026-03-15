@@ -25,6 +25,8 @@ const (
 	Median
 	Mode
 	Correlation
+	VarianceAgg
+	StdDevAgg
 )
 
 // AggregationSpec specifies an aggregation operation.

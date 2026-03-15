@@ -46,6 +46,10 @@ type Expr interface {
 	TrimRight() Expr
 	Length() Expr
 	Match(pattern Expr) Expr
+	Replace(old, new Expr) Expr
+	PadLeft(length, pad Expr) Expr
+	PadRight(length, pad Expr) Expr
+	SplitPart(separator Expr, index Expr) Expr
 
 	// Temporal methods
 	Year() Expr
@@ -185,6 +189,26 @@ func (c *ColumnExpr) Length() Expr {
 // Match tests if string matches a regular expression pattern.
 func (c *ColumnExpr) Match(pattern Expr) Expr {
 	return NewBinaryExpr(c, pattern, "match")
+}
+
+// Replace replaces all occurrences of old with new in the string.
+func (c *ColumnExpr) Replace(old, new Expr) Expr {
+	return NewTernaryExpr(c, old, new, "replace")
+}
+
+// PadLeft pads the string on the left to the given length with the given pad character.
+func (c *ColumnExpr) PadLeft(length, pad Expr) Expr {
+	return NewTernaryExpr(c, length, pad, "pad_left")
+}
+
+// SplitPart splits a string by separator and returns the element at the given index (0-based).
+func (c *ColumnExpr) SplitPart(separator Expr, index Expr) Expr {
+	return NewTernaryExpr(c, separator, index, "split_part")
+}
+
+// PadRight pads the string on the right to the given length with the given pad character.
+func (c *ColumnExpr) PadRight(length, pad Expr) Expr {
+	return NewTernaryExpr(c, length, pad, "pad_right")
 }
 
 // Temporal operations for ColumnExpr
@@ -435,6 +459,22 @@ func (l *LiteralExpr) Length() Expr {
 
 func (l *LiteralExpr) Match(pattern Expr) Expr {
 	return NewBinaryExpr(l, pattern, "match")
+}
+
+func (l *LiteralExpr) Replace(old, new Expr) Expr {
+	return NewTernaryExpr(l, old, new, "replace")
+}
+
+func (l *LiteralExpr) PadLeft(length, pad Expr) Expr {
+	return NewTernaryExpr(l, length, pad, "pad_left")
+}
+
+func (l *LiteralExpr) PadRight(length, pad Expr) Expr {
+	return NewTernaryExpr(l, length, pad, "pad_right")
+}
+
+func (l *LiteralExpr) SplitPart(separator, index Expr) Expr {
+	return NewTernaryExpr(l, separator, index, "split_part")
 }
 
 // Temporal methods for literals
@@ -979,6 +1019,22 @@ func (b *BinaryExpr) Match(pattern Expr) Expr {
 	return NewBinaryExpr(b, pattern, "match")
 }
 
+func (b *BinaryExpr) Replace(old, new Expr) Expr {
+	return NewTernaryExpr(b, old, new, "replace")
+}
+
+func (b *BinaryExpr) PadLeft(length, pad Expr) Expr {
+	return NewTernaryExpr(b, length, pad, "pad_left")
+}
+
+func (b *BinaryExpr) PadRight(length, pad Expr) Expr {
+	return NewTernaryExpr(b, length, pad, "pad_right")
+}
+
+func (b *BinaryExpr) SplitPart(separator, index Expr) Expr {
+	return NewTernaryExpr(b, separator, index, "split_part")
+}
+
 // Temporal methods for binary expressions
 func (b *BinaryExpr) Year() Expr {
 	return NewUnaryExpr(b, "year")
@@ -1293,6 +1349,22 @@ func (u *UnaryExpr) Length() Expr {
 
 func (u *UnaryExpr) Match(pattern Expr) Expr {
 	return NewBinaryExpr(u, pattern, "match")
+}
+
+func (u *UnaryExpr) Replace(old, new Expr) Expr {
+	return NewTernaryExpr(u, old, new, "replace")
+}
+
+func (u *UnaryExpr) PadLeft(length, pad Expr) Expr {
+	return NewTernaryExpr(u, length, pad, "pad_left")
+}
+
+func (u *UnaryExpr) PadRight(length, pad Expr) Expr {
+	return NewTernaryExpr(u, length, pad, "pad_right")
+}
+
+func (u *UnaryExpr) SplitPart(separator, index Expr) Expr {
+	return NewTernaryExpr(u, separator, index, "split_part")
 }
 
 // Temporal methods for UnaryExpr
@@ -2058,6 +2130,386 @@ func (b *BinaryExpr) evaluateMatch(left, right arrow.Array) (arrow.Array, error)
 			}
 
 			builder.Append(re.MatchString(leftVal))
+		}
+	}
+
+	return builder.NewArray(), nil
+}
+
+// ====================
+// Ternary Expression
+// ====================
+
+// TernaryExpr represents operations that take three expression operands.
+// Used for Replace(operand, old, new) and PadLeft/PadRight(operand, length, pad).
+type TernaryExpr struct {
+	first    Expr
+	second   Expr
+	third    Expr
+	operator string
+}
+
+// NewTernaryExpr creates a new ternary expression.
+func NewTernaryExpr(first, second, third Expr, operator string) Expr {
+	return &TernaryExpr{
+		first:    first,
+		second:   second,
+		third:    third,
+		operator: operator,
+	}
+}
+
+// Evaluate implements Expr.Evaluate for ternary operations.
+func (te *TernaryExpr) Evaluate(df *core.DataFrame) (arrow.Array, error) {
+	firstArray, err := te.first.Evaluate(df)
+	if err != nil {
+		return nil, fmt.Errorf("failed to evaluate first operand: %w", err)
+	}
+	defer firstArray.Release()
+
+	secondArray, err := te.second.Evaluate(df)
+	if err != nil {
+		return nil, fmt.Errorf("failed to evaluate second operand: %w", err)
+	}
+	defer secondArray.Release()
+
+	thirdArray, err := te.third.Evaluate(df)
+	if err != nil {
+		return nil, fmt.Errorf("failed to evaluate third operand: %w", err)
+	}
+	defer thirdArray.Release()
+
+	switch te.operator {
+	case "replace":
+		return te.evaluateReplace(firstArray, secondArray, thirdArray)
+	case "pad_left":
+		return te.evaluatePadLeft(firstArray, secondArray, thirdArray)
+	case "pad_right":
+		return te.evaluatePadRight(firstArray, secondArray, thirdArray)
+	case "split_part":
+		return te.evaluateSplitPart(firstArray, secondArray, thirdArray)
+	default:
+		return nil, fmt.Errorf("unsupported ternary operator: %s", te.operator)
+	}
+}
+
+// Name implements Expr.Name for ternary operations.
+func (te *TernaryExpr) Name() string {
+	return fmt.Sprintf("%s(%s, %s, %s)", te.operator, te.first.Name(), te.second.Name(), te.third.Name())
+}
+
+// String implements Expr.String for ternary operations.
+func (te *TernaryExpr) String() string {
+	return fmt.Sprintf("%s(%s, %s, %s)", te.operator, te.first.String(), te.second.String(), te.third.String())
+}
+
+// Fluent methods for TernaryExpr
+func (te *TernaryExpr) Add(other Expr) Expr {
+	return NewBinaryExpr(te, other, "add")
+}
+
+func (te *TernaryExpr) Sub(other Expr) Expr {
+	return NewBinaryExpr(te, other, "subtract")
+}
+
+func (te *TernaryExpr) Mul(other Expr) Expr {
+	return NewBinaryExpr(te, other, "multiply")
+}
+
+func (te *TernaryExpr) Div(other Expr) Expr {
+	return NewBinaryExpr(te, other, "divide")
+}
+
+func (te *TernaryExpr) Gt(other Expr) Expr {
+	return NewBinaryExpr(te, other, "greater")
+}
+
+func (te *TernaryExpr) Lt(other Expr) Expr {
+	return NewBinaryExpr(te, other, "less")
+}
+
+func (te *TernaryExpr) Eq(other Expr) Expr {
+	return NewBinaryExpr(te, other, "equal")
+}
+
+// String manipulation methods for TernaryExpr
+func (te *TernaryExpr) Contains(substring Expr) Expr {
+	return NewBinaryExpr(te, substring, "contains")
+}
+
+func (te *TernaryExpr) StartsWith(prefix Expr) Expr {
+	return NewBinaryExpr(te, prefix, "starts_with")
+}
+
+func (te *TernaryExpr) EndsWith(suffix Expr) Expr {
+	return NewBinaryExpr(te, suffix, "ends_with")
+}
+
+func (te *TernaryExpr) Upper() Expr {
+	return NewUnaryExpr(te, "upper")
+}
+
+func (te *TernaryExpr) Lower() Expr {
+	return NewUnaryExpr(te, "lower")
+}
+
+func (te *TernaryExpr) Trim() Expr {
+	return NewUnaryExpr(te, "trim")
+}
+
+func (te *TernaryExpr) TrimLeft() Expr {
+	return NewUnaryExpr(te, "trim_left")
+}
+
+func (te *TernaryExpr) TrimRight() Expr {
+	return NewUnaryExpr(te, "trim_right")
+}
+
+func (te *TernaryExpr) Length() Expr {
+	return NewUnaryExpr(te, "length")
+}
+
+func (te *TernaryExpr) Match(pattern Expr) Expr {
+	return NewBinaryExpr(te, pattern, "match")
+}
+
+func (te *TernaryExpr) Replace(old, new Expr) Expr {
+	return NewTernaryExpr(te, old, new, "replace")
+}
+
+func (te *TernaryExpr) PadLeft(length, pad Expr) Expr {
+	return NewTernaryExpr(te, length, pad, "pad_left")
+}
+
+func (te *TernaryExpr) PadRight(length, pad Expr) Expr {
+	return NewTernaryExpr(te, length, pad, "pad_right")
+}
+
+func (te *TernaryExpr) SplitPart(separator, index Expr) Expr {
+	return NewTernaryExpr(te, separator, index, "split_part")
+}
+
+// Temporal methods for TernaryExpr
+func (te *TernaryExpr) Year() Expr {
+	return NewUnaryExpr(te, "year")
+}
+
+func (te *TernaryExpr) Month() Expr {
+	return NewUnaryExpr(te, "month")
+}
+
+func (te *TernaryExpr) Day() Expr {
+	return NewUnaryExpr(te, "day")
+}
+
+func (te *TernaryExpr) Hour() Expr {
+	return NewUnaryExpr(te, "hour")
+}
+
+func (te *TernaryExpr) Minute() Expr {
+	return NewUnaryExpr(te, "minute")
+}
+
+func (te *TernaryExpr) Second() Expr {
+	return NewUnaryExpr(te, "second")
+}
+
+func (te *TernaryExpr) TruncateToYear() Expr {
+	return NewUnaryExpr(te, "trunc_year")
+}
+
+func (te *TernaryExpr) TruncateToMonth() Expr {
+	return NewUnaryExpr(te, "trunc_month")
+}
+
+func (te *TernaryExpr) TruncateToDay() Expr {
+	return NewUnaryExpr(te, "trunc_day")
+}
+
+func (te *TernaryExpr) TruncateToHour() Expr {
+	return NewUnaryExpr(te, "trunc_hour")
+}
+
+func (te *TernaryExpr) AddDays(days Expr) Expr {
+	return NewBinaryExpr(te, days, "add_days")
+}
+
+func (te *TernaryExpr) AddHours(hours Expr) Expr {
+	return NewBinaryExpr(te, hours, "add_hours")
+}
+
+func (te *TernaryExpr) AddMinutes(minutes Expr) Expr {
+	return NewBinaryExpr(te, minutes, "add_minutes")
+}
+
+func (te *TernaryExpr) AddSeconds(seconds Expr) Expr {
+	return NewBinaryExpr(te, seconds, "add_seconds")
+}
+
+// evaluateReplace replaces all occurrences of old with new in each string element.
+func (te *TernaryExpr) evaluateReplace(operand, oldStr, newStr arrow.Array) (arrow.Array, error) {
+	if operand.Len() != oldStr.Len() || operand.Len() != newStr.Len() {
+		return nil, fmt.Errorf("array length mismatch in replace operation")
+	}
+
+	if operand.DataType().ID() != arrow.STRING {
+		return nil, fmt.Errorf("replace operation requires string type, got %s", operand.DataType())
+	}
+	if oldStr.DataType().ID() != arrow.STRING {
+		return nil, fmt.Errorf("replace old parameter requires string type, got %s", oldStr.DataType())
+	}
+	if newStr.DataType().ID() != arrow.STRING {
+		return nil, fmt.Errorf("replace new parameter requires string type, got %s", newStr.DataType())
+	}
+
+	strArray := operand.(*array.String)
+	oldArray := oldStr.(*array.String)
+	newArray := newStr.(*array.String)
+
+	pool := memory.NewGoAllocator()
+	builder := array.NewStringBuilder(pool)
+	defer builder.Release()
+
+	for i := 0; i < operand.Len(); i++ {
+		if strArray.IsNull(i) || oldArray.IsNull(i) || newArray.IsNull(i) {
+			builder.AppendNull()
+		} else {
+			result := strings.ReplaceAll(strArray.Value(i), oldArray.Value(i), newArray.Value(i))
+			builder.Append(result)
+		}
+	}
+
+	return builder.NewArray(), nil
+}
+
+// evaluatePadLeft pads strings on the left to the given length with the given pad string.
+func (te *TernaryExpr) evaluatePadLeft(operand, lengthArr, padArr arrow.Array) (arrow.Array, error) {
+	if operand.Len() != lengthArr.Len() || operand.Len() != padArr.Len() {
+		return nil, fmt.Errorf("array length mismatch in pad_left operation")
+	}
+
+	if operand.DataType().ID() != arrow.STRING {
+		return nil, fmt.Errorf("pad_left operation requires string type, got %s", operand.DataType())
+	}
+	if padArr.DataType().ID() != arrow.STRING {
+		return nil, fmt.Errorf("pad_left pad parameter requires string type, got %s", padArr.DataType())
+	}
+
+	strArray := operand.(*array.String)
+	padStrArray := padArr.(*array.String)
+
+	pool := memory.NewGoAllocator()
+	builder := array.NewStringBuilder(pool)
+	defer builder.Release()
+
+	for i := 0; i < operand.Len(); i++ {
+		if strArray.IsNull(i) || lengthArr.IsNull(i) || padStrArray.IsNull(i) {
+			builder.AppendNull()
+		} else {
+			s := strArray.Value(i)
+			targetLen := extractInt64Value(lengthArr, i)
+			padChar := padStrArray.Value(i)
+
+			if len(padChar) == 0 || int64(len(s)) >= targetLen {
+				builder.Append(s)
+			} else {
+				needed := int(targetLen) - len(s)
+				padding := strings.Repeat(padChar, (needed/len(padChar))+1)
+				builder.Append(padding[:needed] + s)
+			}
+		}
+	}
+
+	return builder.NewArray(), nil
+}
+
+// evaluatePadRight pads strings on the right to the given length with the given pad string.
+func (te *TernaryExpr) evaluatePadRight(operand, lengthArr, padArr arrow.Array) (arrow.Array, error) {
+	if operand.Len() != lengthArr.Len() || operand.Len() != padArr.Len() {
+		return nil, fmt.Errorf("array length mismatch in pad_right operation")
+	}
+
+	if operand.DataType().ID() != arrow.STRING {
+		return nil, fmt.Errorf("pad_right operation requires string type, got %s", operand.DataType())
+	}
+	if padArr.DataType().ID() != arrow.STRING {
+		return nil, fmt.Errorf("pad_right pad parameter requires string type, got %s", padArr.DataType())
+	}
+
+	strArray := operand.(*array.String)
+	padStrArray := padArr.(*array.String)
+
+	pool := memory.NewGoAllocator()
+	builder := array.NewStringBuilder(pool)
+	defer builder.Release()
+
+	for i := 0; i < operand.Len(); i++ {
+		if strArray.IsNull(i) || lengthArr.IsNull(i) || padStrArray.IsNull(i) {
+			builder.AppendNull()
+		} else {
+			s := strArray.Value(i)
+			targetLen := extractInt64Value(lengthArr, i)
+			padChar := padStrArray.Value(i)
+
+			if len(padChar) == 0 || int64(len(s)) >= targetLen {
+				builder.Append(s)
+			} else {
+				needed := int(targetLen) - len(s)
+				padding := strings.Repeat(padChar, (needed/len(padChar))+1)
+				builder.Append(s + padding[:needed])
+			}
+		}
+	}
+
+	return builder.NewArray(), nil
+}
+
+// extractInt64Value extracts an int64 value from an Arrow array at a given index.
+// Supports Int64 and Float64 arrays (float64 is truncated to int64).
+func extractInt64Value(arr arrow.Array, i int) int64 {
+	switch a := arr.(type) {
+	case *array.Int64:
+		return a.Value(i)
+	case *array.Float64:
+		return int64(a.Value(i))
+	case *array.Int32:
+		return int64(a.Value(i))
+	default:
+		return 0
+	}
+}
+
+// evaluateSplitPart splits strings by a separator and returns the part at the given index.
+func (te *TernaryExpr) evaluateSplitPart(operand, separatorArr, indexArr arrow.Array) (arrow.Array, error) {
+	strArr, ok := operand.(*array.String)
+	if !ok {
+		return nil, fmt.Errorf("split_part requires string operand, got %s", operand.DataType())
+	}
+
+	sepArr, ok := separatorArr.(*array.String)
+	if !ok {
+		return nil, fmt.Errorf("split_part separator must be string, got %s", separatorArr.DataType())
+	}
+
+	pool := memory.NewGoAllocator()
+	builder := array.NewStringBuilder(pool)
+	defer builder.Release()
+
+	for i := 0; i < strArr.Len(); i++ {
+		if strArr.IsNull(i) || sepArr.IsNull(i) {
+			builder.AppendNull()
+			continue
+		}
+
+		s := strArr.Value(i)
+		sep := sepArr.Value(i)
+		idx := extractInt64Value(indexArr, i)
+
+		parts := strings.Split(s, sep)
+		if int(idx) >= 0 && int(idx) < len(parts) {
+			builder.Append(parts[int(idx)])
+		} else {
+			builder.Append("")
 		}
 	}
 

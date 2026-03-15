@@ -45,6 +45,7 @@ go.work
 # Coverage reports
 coverage.txt
 coverage.html
+.cover/
 
 # Benchmarking results
 *.bench
