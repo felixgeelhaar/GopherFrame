@@ -238,11 +238,4 @@ jobs:
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: |
-        PLAN_OUTPUT=$(relicta plan --no-ai 2>&1)
-        echo "$PLAN_OUTPUT"
-        LEVEL=$(echo "$PLAN_OUTPUT" | grep "Release type:" | sed 's/.*: *\([a-z]*\).*/\1/')
-        echo "Detected bump level: $LEVEL"
-        relicta bump --level "$LEVEL"
-        relicta notes
-        relicta approve --yes --ci
-        relicta publish --ci
+        relicta release --ci --clean
