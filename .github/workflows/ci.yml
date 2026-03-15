@@ -233,11 +233,23 @@ jobs:
         tar xzf relicta.tar.gz
         chmod +x relicta
         sudo mv relicta /usr/local/bin/
-        relicta plugin install github
-        relicta plugin enable github
 
     - name: Run Relicta release
+      id: relicta
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: |
-        relicta release --ci --clean --yes
+        OUTPUT=$(relicta release --ci --clean --yes 2>&1)
+        echo "$OUTPUT"
+        VERSION=$(echo "$OUTPUT" | grep -oP 'Released \K[0-9]+\.[0-9]+\.[0-9]+')
+        echo "version=$VERSION" >> $GITHUB_OUTPUT
+        echo "tag=v$VERSION" >> $GITHUB_OUTPUT
+
+    - name: Create GitHub Release
+      if: steps.relicta.outputs.version != ''
+      env:
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      run: |
+        gh release create "${{ steps.relicta.outputs.tag }}" \
+          --title "GopherFrame ${{ steps.relicta.outputs.tag }}" \
+          --generate-notes
