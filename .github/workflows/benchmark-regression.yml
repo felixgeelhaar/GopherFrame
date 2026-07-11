@@ -17,6 +17,11 @@ jobs:
   benchmark-comparison:
     name: Compare Benchmarks vs Base Branch
     runs-on: ubuntu-latest
+    # Non-blocking: microbenchmark variance on shared runners makes the >10%
+    # regression threshold flaky (e.g. Gota comparison benches swing ±15%
+    # unrelated to code changes). The benchstat comparison still runs and is
+    # posted as a PR comment for visibility; it just no longer fails CI.
+    continue-on-error: true
 
     steps:
     - name: Checkout PR code
