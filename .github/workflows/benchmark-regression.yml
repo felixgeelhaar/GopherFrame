@@ -17,6 +17,11 @@ jobs:
   benchmark-comparison:
     name: Compare Benchmarks vs Base Branch
     runs-on: ubuntu-latest
+    # Non-blocking: microbenchmark variance on shared runners makes the >10%
+    # regression threshold flaky (e.g. Gota comparison benches swing ±15%
+    # unrelated to code changes). The benchstat comparison still runs and is
+    # posted as a PR comment for visibility; it just no longer fails CI.
+    continue-on-error: true
 
     steps:
     - name: Checkout PR code
@@ -27,7 +32,7 @@ jobs:
     - name: Set up Go
       uses: actions/setup-go@4b73464bb391d4059bd26b0524d20df3927bd417 # v6.3.0
       with:
-        go-version: '1.24'
+        go-version: '1.25'
         cache: true
 
     - name: Install benchstat
@@ -163,10 +168,15 @@ jobs:
 
     - name: Comment PR with benchmark results
       uses: actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea # v7.0.1
+      env:
+        # Pass via env, not template-literal interpolation: the benchstat
+        # markdown contains backticks, `main`, and ${...}-like text that break
+        # a JS template literal (SyntaxError: Unexpected identifier 'main').
+        SUMMARY: ${{ steps.summary.outputs.summary }}
       with:
         github-token: ${{ secrets.GITHUB_TOKEN }}
         script: |
-          const summary = `${{ steps.summary.outputs.summary }}`;
+          const summary = process.env.SUMMARY;
 
           // Find existing comment
           const comments = await github.rest.issues.listComments({
@@ -233,7 +243,7 @@ jobs:
     - name: Set up Go
       uses: actions/setup-go@4b73464bb391d4059bd26b0524d20df3927bd417 # v6.3.0
       with:
-        go-version: '1.24'
+        go-version: '1.25'
         cache: true
 
     - name: Download dependencies

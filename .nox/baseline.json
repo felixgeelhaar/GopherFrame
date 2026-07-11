@@ -1,0 +1,131 @@
+{
+  "schema_version": "1.0.0",
+  "entries": [
+    {
+      "fingerprint": "0f25cef718a612f5e50b51e0715aff07723bad7e74bf20b3892e87624bc5cf7e",
+      "rule_id": "DATA-001",
+      "file_path": "pkg/expr/string_test.go",
+      "severity": "medium",
+      "reason": "Documented first-party false positives: test-fixture strings (DATA-001, SEC-163), CI workflow IAC rules (IAC-018/308/309/310/314). No critical/high. Baseline flips the CI gate from report-only to enforcing net-new critical/high.",
+      "owner": "felixgeelhaar",
+      "created_at": "2026-07-11T11:16:13.527377Z"
+    },
+    {
+      "fingerprint": "1a73f67ebf5b8489e75db8181b14cb703e078b9fb7eada6e9b58cbe22b5dc5bd",
+      "rule_id": "DATA-001",
+      "file_path": "pkg/expr/string_test.go",
+      "severity": "medium",
+      "reason": "Documented first-party false positives: test-fixture strings (DATA-001, SEC-163), CI workflow IAC rules (IAC-018/308/309/310/314). No critical/high. Baseline flips the CI gate from report-only to enforcing net-new critical/high.",
+      "owner": "felixgeelhaar",
+      "created_at": "2026-07-11T11:16:13.527377Z"
+    },
+    {
+      "fingerprint": "78c9bb57bbc6d45ec485f997a82f4634ac6f9cfdc0102731f827e95191e0c85b",
+      "rule_id": "DATA-001",
+      "file_path": "string_expressions_test.go",
+      "severity": "medium",
+      "reason": "Documented first-party false positives: test-fixture strings (DATA-001, SEC-163), CI workflow IAC rules (IAC-018/308/309/310/314). No critical/high. Baseline flips the CI gate from report-only to enforcing net-new critical/high.",
+      "owner": "felixgeelhaar",
+      "created_at": "2026-07-11T11:16:13.527377Z"
+    },
+    {
+      "fingerprint": "e452a90e7d49f7d638d797ffccaf06f296e463315d315d4489dcf72c6164b7ee",
+      "rule_id": "DATA-001",
+      "file_path": "string_expressions_test.go",
+      "severity": "medium",
+      "reason": "Documented first-party false positives: test-fixture strings (DATA-001, SEC-163), CI workflow IAC rules (IAC-018/308/309/310/314). No critical/high. Baseline flips the CI gate from report-only to enforcing net-new critical/high.",
+      "owner": "felixgeelhaar",
+      "created_at": "2026-07-11T11:16:13.527377Z"
+    },
+    {
+      "fingerprint": "9b4089112ccd5738660355ef34596b036db7c3859250281887687d0d2da13583",
+      "rule_id": "DATA-001",
+      "file_path": "string_expressions_test.go",
+      "severity": "medium",
+      "reason": "Documented first-party false positives: test-fixture strings (DATA-001, SEC-163), CI workflow IAC rules (IAC-018/308/309/310/314). No critical/high. Baseline flips the CI gate from report-only to enforcing net-new critical/high.",
+      "owner": "felixgeelhaar",
+      "created_at": "2026-07-11T11:16:13.527377Z"
+    },
+    {
+      "fingerprint": "6a2fbb11ffc9aa407e93cc3f3df3b32c2d07cea6a62be32d48743b6ba07c0357",
+      "rule_id": "DATA-001",
+      "file_path": "string_expressions_test.go",
+      "severity": "medium",
+      "reason": "Documented first-party false positives: test-fixture strings (DATA-001, SEC-163), CI workflow IAC rules (IAC-018/308/309/310/314). No critical/high. Baseline flips the CI gate from report-only to enforcing net-new critical/high.",
+      "owner": "felixgeelhaar",
+      "created_at": "2026-07-11T11:16:13.527377Z"
+    },
+    {
+      "fingerprint": "bc549bd83bda47b0f1e5c6cb3fc9d67db65f4fbd72cdd30697bdbc6657d167bb",
+      "rule_id": "IAC-018",
+      "file_path": ".github/workflows/ci.yml",
+      "severity": "low",
+      "reason": "Documented first-party false positives: test-fixture strings (DATA-001, SEC-163), CI workflow IAC rules (IAC-018/308/309/310/314). No critical/high. Baseline flips the CI gate from report-only to enforcing net-new critical/high.",
+      "owner": "felixgeelhaar",
+      "created_at": "2026-07-11T11:16:13.527377Z"
+    },
+    {
+      "fingerprint": "52922952e40b8c5ebd4fef0969dd782d57266e9ecccc4e9bddc9be74f0f6daa2",
+      "rule_id": "IAC-308",
+      "file_path": ".github/workflows/nox-remediate.yml",
+      "severity": "low",
+      "reason": "Documented first-party false positives: test-fixture strings (DATA-001, SEC-163), CI workflow IAC rules (IAC-018/308/309/310/314). No critical/high. Baseline flips the CI gate from report-only to enforcing net-new critical/high.",
+      "owner": "felixgeelhaar",
+      "created_at": "2026-07-11T11:16:13.527377Z"
+    },
+    {
+      "fingerprint": "530e8464b73bb94d797aa233bcd4b2ea933dd8644a2b0a15d0bb6b7ba128980d",
+      "rule_id": "IAC-309",
+      "file_path": ".github/workflows/nox-scan.yml",
+      "severity": "low",
+      "reason": "Documented first-party false positives: test-fixture strings (DATA-001, SEC-163), CI workflow IAC rules (IAC-018/308/309/310/314). No critical/high. Baseline flips the CI gate from report-only to enforcing net-new critical/high.",
+      "owner": "felixgeelhaar",
+      "created_at": "2026-07-11T11:16:13.527377Z"
+    },
+    {
+      "fingerprint": "faae53eee5aab123b480b37ae6df3775272ea7eb6546c6b64ee45cf14a19b173",
+      "rule_id": "IAC-310",
+      "file_path": ".github/workflows/ci.yml",
+      "severity": "medium",
+      "reason": "Documented first-party false positives: test-fixture strings (DATA-001, SEC-163), CI workflow IAC rules (IAC-018/308/309/310/314). No critical/high. Baseline flips the CI gate from report-only to enforcing net-new critical/high.",
+      "owner": "felixgeelhaar",
+      "created_at": "2026-07-11T11:16:13.527377Z"
+    },
+    {
+      "fingerprint": "d82e27dfb202bb7c3606da636657479306d4d52b9caa9e80ef3e5e0eeb560564",
+      "rule_id": "IAC-314",
+      "file_path": ".github/workflows/ci.yml",
+      "severity": "medium",
+      "reason": "Documented first-party false positives: test-fixture strings (DATA-001, SEC-163), CI workflow IAC rules (IAC-018/308/309/310/314). No critical/high. Baseline flips the CI gate from report-only to enforcing net-new critical/high.",
+      "owner": "felixgeelhaar",
+      "created_at": "2026-07-11T11:16:13.527377Z"
+    },
+    {
+      "fingerprint": "8378df7a1d4adb5806616a668bc89e456b48fe9b7212ca5799b5b8eddbe0ae9c",
+      "rule_id": "IAC-314",
+      "file_path": ".github/workflows/nox-remediate.yml",
+      "severity": "medium",
+      "reason": "Documented first-party false positives: test-fixture strings (DATA-001, SEC-163), CI workflow IAC rules (IAC-018/308/309/310/314). No critical/high. Baseline flips the CI gate from report-only to enforcing net-new critical/high.",
+      "owner": "felixgeelhaar",
+      "created_at": "2026-07-11T11:16:13.527377Z"
+    },
+    {
+      "fingerprint": "e8fc46e981f17c32a73ba5791d2285bee7507d22ef7cccec32017c4ebc7f057f",
+      "rule_id": "SEC-163",
+      "file_path": "pkg/core/dataframe_join_test.go",
+      "severity": "medium",
+      "reason": "Documented first-party false positives: test-fixture strings (DATA-001, SEC-163), CI workflow IAC rules (IAC-018/308/309/310/314). No critical/high. Baseline flips the CI gate from report-only to enforcing net-new critical/high.",
+      "owner": "felixgeelhaar",
+      "created_at": "2026-07-11T11:16:13.527377Z"
+    },
+    {
+      "fingerprint": "1463a6a56cb8771f48cfed433c49fd7c6e9a12fa0c3e75dc2c491bdcbbd05cd6",
+      "rule_id": "SEC-163",
+      "file_path": "pkg/core/phase2_benchmarks_test.go",
+      "severity": "medium",
+      "reason": "Documented first-party false positives: test-fixture strings (DATA-001, SEC-163), CI workflow IAC rules (IAC-018/308/309/310/314). No critical/high. Baseline flips the CI gate from report-only to enforcing net-new critical/high.",
+      "owner": "felixgeelhaar",
+      "created_at": "2026-07-11T11:16:13.527377Z"
+    }
+  ]
+}
