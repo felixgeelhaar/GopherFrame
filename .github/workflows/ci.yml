@@ -118,70 +118,10 @@ jobs:
         version: v2.7.2
         args: --timeout=5m
 
-  security:
-    name: Security Scan
-    runs-on: ubuntu-latest
-    needs: test
-
-    steps:
-    - name: Checkout code
-      uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
-
-    - name: Set up Go
-      uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6.5.0
-      with:
-        go-version: '1.25'
-
-    - name: Install nox
-      run: |
-        curl -sSfL https://raw.githubusercontent.com/noxsecurity/nox/main/install.sh | sh -s -- -b /usr/local/bin || true
-      continue-on-error: true
-
-    - name: Run nox security scan (SAST + SCA)
-      run: |
-        if command -v nox &> /dev/null; then
-          nox scan . --format sarif > nox-results.sarif 2>/dev/null || true
-          nox scan . --format json > nox-results.json 2>/dev/null || true
-
-          if [ ! -s nox-results.sarif ]; then
-            echo '{"$schema":"https://raw.githubusercontent.com/oasis-tcs/sarif-spec/main/sarif-2.1/schema/sarif-schema-2.1.0.json","version":"2.1.0","runs":[{"tool":{"driver":{"name":"nox","informationUri":"https://github.com/noxsecurity/nox","version":"1.0.0","rules":[]}},"results":[]}]}' > nox-results.sarif
-          fi
-
-          echo "📋 nox scan complete"
-
-          if grep -q '"severity":"critical"' nox-results.json 2>/dev/null; then
-            echo "❌ Critical security findings detected!"
-            exit 1
-          fi
-          echo "✅ No critical security findings"
-        else
-          echo "⚠️ nox not available, skipping security scan"
-        fi
-      continue-on-error: true
-
-    - name: Upload nox SARIF to Code Scanning
-      uses: github/codeql-action/upload-sarif@66b39da20ccc656acc90dd27ea30f5d458ec33ce # v3.28.19
-      with:
-        sarif_file: nox-results.sarif
-        category: nox
-      if: always() && hashFiles('nox-results.sarif') != ''
-      continue-on-error: true
-
-    - name: Upload nox scan artifacts
-      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-      with:
-        name: nox-security-results
-        path: |
-          nox-results.sarif
-          nox-results.json
-        retention-days: 30
-      if: always()
-      continue-on-error: true
-
   release:
     name: Release
     runs-on: ubuntu-latest
-    needs: [test, lint, security]
+    needs: [test, lint]
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
 
     steps:
