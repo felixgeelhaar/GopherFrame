@@ -157,15 +157,13 @@ jobs:
         else
           echo "⚠️ nox not available, skipping security scan"
         fi
-      continue-on-error: true
 
     - name: Upload nox SARIF to Code Scanning
       uses: github/codeql-action/upload-sarif@66b39da20ccc656acc90dd27ea30f5d458ec33ce # v3.28.19
       with:
         sarif_file: nox-results.sarif
         category: nox
-      if: always() && hashFiles('nox-results.sarif') != ''
-      continue-on-error: true
+      if: always() && hashFiles('nox-results.sarif') != '' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
 
     - name: Upload nox scan artifacts
       uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
@@ -176,7 +174,6 @@ jobs:
           nox-results.json
         retention-days: 30
       if: always()
-      continue-on-error: true
 
   release:
     name: Release
