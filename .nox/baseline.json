@@ -126,6 +126,15 @@
       "reason": "Documented first-party false positives: test-fixture strings (DATA-001, SEC-163), CI workflow IAC rules (IAC-018/308/309/310/314). No critical/high. Baseline flips the CI gate from report-only to enforcing net-new critical/high.",
       "owner": "felixgeelhaar",
       "created_at": "2026-07-11T11:16:13.527377Z"
+    },
+    {
+      "fingerprint": "efffd45e45bdf218052ebd23a0a2fc2295219290f6341d868fed455c871b6993",
+      "rule_id": "IAC-155",
+      "file_path": ".github/workflows/nox-remediate.yml",
+      "severity": "medium",
+      "reason": "Reviewed false positive: nox-remediate.yml is a thin caller of the shared felixgeelhaar/.github reusable workflow; workflow_dispatch already requires repository write access, and the job only opens a PR (never merges), so an environment approval gate adds nothing.",
+      "owner": "felixgeelhaar",
+      "created_at": "2026-11-15T10:20:05.172241Z"
     }
   ]
 }
