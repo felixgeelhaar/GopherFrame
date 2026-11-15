@@ -9,7 +9,7 @@
 [![Go Version](https://img.shields.io/badge/Go-1.24+-00ADD8.svg)](https://go.dev/)
 [![Tests](https://img.shields.io/badge/tests-438%20passing-brightgreen.svg)](.github/workflows/ci.yml)
 [![Coverage](https://img.shields.io/badge/coverage-81.4%25-brightgreen.svg)](.coverctl.yaml)
-[![Security](https://img.shields.io/badge/security-0%20critical-brightgreen.svg)](SECURITY.md)
+[![nox security grade](.github/nox-badge.svg)](.github/workflows/nox-scan.yml)
 
 GopherFrame is a high-performance DataFrame library for Go, built on Apache Arrow for zero-copy data operations and seamless interoperability with the modern data ecosystem. Designed from the ground up for production use, it provides **2-428x better performance** than existing Go alternatives while maintaining type safety and idiomatic Go design.
 
